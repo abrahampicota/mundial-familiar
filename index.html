@@ -299,29 +299,42 @@ function matchCard(m) {
     else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3 pts ✓ Ganador</span>';
     else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0 pts ✗</span>';
     else ptsBadge = '<span class="pts-badge pts-pending">Pendiente</span>';
+    const deadline = new Date('2026-06-11T05:00:00Z');
+    const canEdit = new Date() < deadline && !done;
+    const borderColor = pts === 5 ? '#00875A' : pts === 3 ? '#5a5000' : pts === 0 ? '#742a2a' : '#00875A';
+    const bgColor = pts === 5 ? '#0d2a1a' : pts === 3 ? '#1a1a05' : pts === 0 ? '#1a0808' : '#0d2a1a';
     predHtml = `
-      <div style="text-align:center;padding:8px 0;">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Tu pronóstico</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);margin-bottom:6px;">${myPred.pred_goals1} - ${myPred.pred_goals2}</div>
+      <div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:12px;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;">
+          <span style="font-size:11px;color:#7a9a7a;text-transform:uppercase;letter-spacing:1px;">Tu pronóstico</span>
+          <span style="font-size:14px;color:${borderColor};">✓ Guardado</span>
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:#F5C518;margin-bottom:6px;">${myPred.pred_goals1} - ${myPred.pred_goals2}</div>
         ${ptsBadge}
+        ${canEdit ? `<button onclick="editPred(${m.id})" style="margin-top:10px;padding:5px 16px;border:1px solid #2a382a;border-radius:6px;background:none;color:#7a9a7a;font-size:12px;cursor:pointer;">✏️ Editar</button>` : ''}
       </div>`;
   } else if (!done) {
-    // Show input form
+    // Can edit until June 11 2026 00:00 UTC-5 (Panama)
+    const deadline = new Date('2026-06-11T05:00:00Z');
+    const canEdit = new Date() < deadline;
     predHtml = `
       <div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center;">¿Cuál será el marcador?</div>
         <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:10px;">
           <div style="text-align:center;">
             <div class="score-team-label">${m.team1}</div>
-            <input class="score-input" id="g1-${m.id}" type="number" min="0" max="20" placeholder="0" />
+            <input class="score-input" id="g1-${m.id}" type="number" min="0" max="20" placeholder="?" ${!canEdit ? 'disabled' : ''} />
           </div>
           <div class="score-sep" style="margin-bottom:8px;">-</div>
           <div style="text-align:center;">
             <div class="score-team-label">${m.team2}</div>
-            <input class="score-input" id="g2-${m.id}" type="number" min="0" max="20" placeholder="0" />
+            <input class="score-input" id="g2-${m.id}" type="number" min="0" max="20" placeholder="?" ${!canEdit ? 'disabled' : ''} />
           </div>
         </div>
-        <button class="btn-save-pred" onclick="savePred(${m.id})">Guardar pronóstico</button>
+        ${canEdit
+          ? '<button class="btn-save-pred" onclick="savePred(' + m.id + ')">Guardar pronóstico</button>'
+          : '<div style="text-align:center;font-size:12px;color:#fc8181;padding:6px 0;">⏰ Plazo vencido — el Mundial ya comenzó</div>'
+        }
       </div>`;
   } else {
     predHtml = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">No hiciste un pronóstico para este partido</div>`;
@@ -384,10 +397,10 @@ async function savePred(matchId) {
   const g1Input = document.getElementById('g1-' + matchId);
   const g2Input = document.getElementById('g2-' + matchId);
   if (!g1Input || !g2Input) return;
-  const g1 = parseInt(g1Input.value);
-  const g2 = parseInt(g2Input.value);
+  const g1 = g1Input.value === '' ? NaN : parseInt(g1Input.value);
+  const g2 = g2Input.value === '' ? NaN : parseInt(g2Input.value);
   if (isNaN(g1) || isNaN(g2) || g1 < 0 || g2 < 0) {
-    showToast('Ingresa un marcador para los dos equipos (0 o más goles)', 'error'); return;
+    showToast('Ingresa el marcador para ambos equipos antes de guardar', 'error'); return;
     return;
   }
   if (allPredictions.find(p => p.match_id === matchId && p.user_id === currentUser.id)) return;
