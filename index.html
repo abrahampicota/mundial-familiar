@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mundial Familiar Picotas - 2026</title>
+<title>Mundial Familiar 2026</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -84,7 +84,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-logo">⚽ Mundial Picotas 2026</div>
+    <div class="login-logo">⚽ Mundial</div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1.5rem;">FAMILIAR 2026</div>
     <div id="view-login">
       <input class="input" id="l-email" type="email" placeholder="Correo electrónico" />
@@ -94,7 +94,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       <div class="login-err" id="login-err"></div>
     </div>
     <div id="view-register" style="display:none">
-      <input class="input" id="r-name" type="text" placeholder="Tu nombre (aparece en la tabla)" />
+      <input class="input" id="r-name" type="text" placeholder="Tu nombre completo" />
+      <input class="input" id="r-nick" type="text" placeholder="Nickname (ej: Tito, Abuela, Papi)" />
       <input class="input" id="r-email" type="email" placeholder="Correo electrónico" />
       <input class="input" id="r-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)" />
       <button class="btn-main" id="btn-register" onclick="doRegister()">Crear cuenta</button>
@@ -106,7 +107,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 
 <div id="app">
   <header>
-    <div class="logo">⚽ Mundial <span>Familiar Picotas</span></div>
+    <div class="logo">⚽ Mundial <span>Familiar</span></div>
     <div style="display:flex;align-items:center;gap:10px;">
       <strong id="header-name" style="font-size:14px;"></strong>
       <button class="btn-logout" onclick="logout()">Salir</button>
@@ -116,6 +117,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <button class="nav-btn active" onclick="showTab('partidos',this)">Partidos</button>
     <button class="nav-btn" onclick="showTab('tabla',this)">Tabla</button>
     <button class="nav-btn" onclick="showTab('perfil',this)">Mi perfil</button>
+    <button class="nav-btn" id="nav-admin" style="display:none" onclick="showTab('admin',this)">Admin</button>
   </nav>
   <main>
     <div id="tab-partidos" class="section active">
@@ -138,6 +140,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       <div class="section-title">Mi perfil</div>
       <div id="profile-container"></div>
     </div>
+    <div id="tab-admin" class="section">
+      <div class="section-title">Admin</div>
+      <div id="admin-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
+    </div>
   </main>
 </div>
 
@@ -145,6 +151,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 const SUPABASE_URL = 'https://kzomuimnoxtcfjcuqgiu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_4U3skEL7RboqhnEn8wap2w_jT3C1lMP';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const ADMIN_EMAIL = 'abrahampicota@gmail.com';
 
 let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [];
 
@@ -184,22 +191,25 @@ async function doLogin() {
 }
 async function doRegister() {
   const name = document.getElementById('r-name').value.trim();
+  const nick = document.getElementById('r-nick').value.trim();
   const email = document.getElementById('r-email').value.trim();
   const pass = document.getElementById('r-pass').value;
   const err = document.getElementById('register-err');
   err.textContent = '';
   if (!name) { err.textContent = 'Ingresa tu nombre'; return; }
+  if (!nick) { err.textContent = 'Ingresa un nickname'; return; }
   if (!email) { err.textContent = 'Ingresa tu correo'; return; }
   if (pass.length < 6) { err.textContent = 'La contraseña debe tener al menos 6 caracteres'; return; }
   document.getElementById('btn-register').textContent = '...';
-  const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { name } } });
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { name, nickname: nick } } });
   if (error) { err.textContent = error.message; document.getElementById('btn-register').textContent = 'Crear cuenta'; return; }
-  if (data.user) { await ensureProfile(data.user, name); await initApp(data.user); }
+  if (data.user) { await ensureProfile(data.user, name, nick); await initApp(data.user); }
   else { err.style.color='#68d391'; err.textContent='Revisa tu correo para confirmar.'; document.getElementById('btn-register').textContent='Crear cuenta'; }
 }
-async function ensureProfile(user, name) {
+async function ensureProfile(user, name, nick) {
   const displayName = name || user.user_metadata?.name || user.email.split('@')[0];
-  await sb.from('profiles').upsert({ id: user.id, name: displayName, email: user.email }, { onConflict: 'id' });
+  const nickname = nick || user.user_metadata?.nickname || displayName;
+  await sb.from('profiles').upsert({ id: user.id, name: displayName, nickname, email: user.email }, { onConflict: 'id' });
 }
 async function logout() { await sb.auth.signOut(); location.reload(); }
 async function initApp(user) {
@@ -207,9 +217,12 @@ async function initApp(user) {
   await ensureProfile(user, user.user_metadata?.name);
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   currentProfile = profile;
-  document.getElementById('header-name').textContent = profile?.name || user.email;
+  document.getElementById('header-name').textContent = profile?.nickname || profile?.name || user.email;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  if (user.email === ADMIN_EMAIL) {
+    document.getElementById('nav-admin').style.display = 'block';
+  }
   await loadMatches();
 }
 
@@ -221,6 +234,7 @@ function showTab(name, btn) {
   btn.classList.add('active');
   if (name === 'tabla') loadLeaderboard();
   if (name === 'perfil') renderProfile();
+  if (name === 'admin') loadAdmin();
 }
 
 // ── MATCHES ───────────────────────────────────────────
@@ -289,37 +303,57 @@ function matchCard(m) {
     predHtml = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">No hiciste un pronóstico para este partido</div>`;
   }
 
-  // Family predictions
-  const matchPreds = allPredictions.filter(p => p.match_id === m.id && p.user_id !== currentUser.id);
-  const chipsHtml = matchPreds.map(p => {
+  // All predictions sorted by pts — collapsible mini-ranking
+  const allMatchPreds = allPredictions.filter(p => p.match_id === m.id);
+  const rankedPreds = allMatchPreds.map(p => {
     const pts = done ? calcPts(p.pred_goals1, p.pred_goals2, m.goals1, m.goals2) : null;
-    let ptsBadge = '';
-    if (pts === 5) ptsBadge = '<span class="pts-badge pts-exact">+5</span>';
-    else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3</span>';
-    else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0</span>';
-    else ptsBadge = '<span class="pts-badge pts-pending">—</span>';
-    return `<div class="family-chip">
-      <span style="font-weight:500">${p.profiles?.name||'?'}</span>
-      <span class="family-score">${p.pred_goals1} - ${p.pred_goals2}</span>
-      ${ptsBadge}
-    </div>`;
+    return { ...p, pts };
+  }).sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1));
+
+  const rankingRows = rankedPreds.map((p, i) => {
+    const isMe = p.user_id === currentUser.id;
+    let bg = '#1a221a', border = '#2a382a', ptsTxt = '—', ptsColor = '#7a9a7a';
+    if (p.pts === 5)      { bg='#0d2a1a'; border='#00875A'; ptsTxt='+5 ⭐'; ptsColor='#68d391'; }
+    else if (p.pts === 3) { bg='#1a1a05'; border='#5a5000'; ptsTxt='+3';    ptsColor='#F5C518'; }
+    else if (p.pts === 0) { bg='#1a0808'; border='#742a2a'; ptsTxt='0';     ptsColor='#fc8181'; }
+    const predScore = (p.pred_goals1 !== null && p.pred_goals2 !== null) ? p.pred_goals1+' - '+p.pred_goals2 : 'Sin pronóstico';
+    const leftBorder = isMe ? 'border-left:3px solid #F5C518;' : '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:'+bg+';border:1px solid '+border+';'+leftBorder+'">'
+      +'<div style="font-size:12px;font-weight:700;width:18px;color:#7a9a7a">'+(i+1)+'</div>'
+      +'<div style="width:28px;height:28px;border-radius:50%;background:#006644;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#F5C518;flex-shrink:0">'+(p.profiles?.name||'?')[0].toUpperCase()+'</div>'
+      +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:500;color:#e8f0e8">'+(p.profiles?.name||'?')+(isMe?' <span style="font-size:10px;color:#7a9a7a">(tú)</span>':'')+'</div>'
+        +'<div style="font-size:11px;color:#7a9a7a">Pronosticó: '+predScore+'</div>'
+      +'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:'+ptsColor+'">'+ptsTxt+'</div>'
+      +'</div>';
   }).join('');
 
-  return `<div class="match-card">
-    <div class="match-meta">
-      <span class="match-group">${m.group_name||''}</span>
-      <div style="display:flex;gap:8px;align-items:center;">${badgeHtml}<span class="match-date">${dateStr}</span></div>
-    </div>
-    <div class="match-teams">
-      <div class="team-name team-left">${m.team1}</div>
-      ${scoreHtml}
-      <div class="team-name">${m.team2}</div>
-    </div>
-    <div class="pred-section">
-      ${predHtml}
-      ${chipsHtml ? `<div style="margin-top:10px;font-size:11px;color:var(--text-muted);margin-bottom:6px;">PRONÓSTICOS DE TU FAMILIA</div><div class="family-preds">${chipsHtml}</div>` : ''}
-    </div>
-  </div>`;
+  const rankingSection = rankedPreds.length > 0 ? (
+    '<div style="border-top:1px solid #2a382a;margin-top:12px;padding-top:12px;">'
+    +'<button onclick="toggleRanking('r-'+m.id+'')" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:0;">'
+      +'<span style="font-size:11px;color:#7a9a7a;text-transform:uppercase;letter-spacing:1px;">Puntos por partido ('+rankedPreds.length+')</span>'
+      +'<span id="r-'+m.id+'-icon" style="font-size:12px;color:#7a9a7a">▼ Ver</span>'
+    +'</button>'
+    +'<div id="r-'+m.id+'" style="display:none;margin-top:10px;">'+rankingRows+'</div>'
+    +'</div>'
+  ) : '';
+
+  return '<div class="match-card">'
+    +'<div class="match-meta">'
+      +'<span class="match-group">'+(m.group_name||'')+'</span>'
+      +'<div style="display:flex;gap:8px;align-items:center;">'+badgeHtml+'<span class="match-date">'+dateStr+'</span></div>'
+    +'</div>'
+    +'<div class="match-teams">'
+      +'<div class="team-name team-left">'+m.team1+'</div>'
+      +scoreHtml
+      +'<div class="team-name">'+m.team2+'</div>'
+    +'</div>'
+    +'<div class="pred-section">'
+      +predHtml
+      +rankingSection
+    +'</div>'
+  +'</div>';
 }
 
 async function savePred(matchId) {
@@ -399,9 +433,16 @@ async function renderProfile() {
   });
   document.getElementById('profile-container').innerHTML = `
     <div class="card" style="text-align:center;border-color:var(--gold);margin-bottom:1rem;">
-      <div class="lb-avatar" style="margin:0 auto 10px;width:60px;height:60px;font-size:1.5rem;">${currentProfile?.name?.[0]?.toUpperCase()||'?'}</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;">${currentProfile?.name||''}</div>
-      <div style="font-size:13px;color:var(--text-muted)">${currentProfile?.email||''}</div>
+      <div class="lb-avatar" style="margin:0 auto 10px;width:60px;height:60px;font-size:1.5rem;">${(currentProfile?.nickname||currentProfile?.name||'?')[0].toUpperCase()}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold)">${currentProfile?.nickname||currentProfile?.name||''}</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">${currentProfile?.name||''}</div>
+      <div style="font-size:12px;color:var(--text-muted)">${currentProfile?.email||''}</div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:center;">
+        <input id="nick-input" type="text" placeholder="Cambiar nickname" value="${currentProfile?.nickname||''}"
+          style="padding:6px 10px;background:#1a221a;border:1px solid #2a382a;border-radius:6px;color:#e8f0e8;font-size:13px;width:160px;outline:none;" />
+        <button onclick="saveNickname()" style="padding:6px 12px;background:#F5C518;color:#0a0f0a;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Guardar</button>
+      </div>
+      <div id="nick-msg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
     </div>
     <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat-card"><div class="stat-num">${totalPts}</div><div class="stat-label">Puntos</div></div>
@@ -432,6 +473,95 @@ async function renderProfile() {
 }
 
 // ── INIT ──────────────────────────────────────────────
+function nickOf(p) {
+  return p.nickname || p.name || '?';
+}
+
+async function loadAdmin() {
+  const container = document.getElementById('admin-container');
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando usuarios...</div>';
+  const { data: profiles, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+  const { data: preds } = await sb.from('predictions').select('user_id');
+  if (error || !profiles) { container.innerHTML = '<div class="empty">Error cargando usuarios.</div>'; return; }
+
+  const predCount = {};
+  (preds||[]).forEach(p => { predCount[p.user_id] = (predCount[p.user_id]||0) + 1; });
+
+  container.innerHTML =
+    '<div class="card" style="margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">'
+      +'<div>'
+        +'<div style="font-size:1.8rem;font-weight:700;color:#F5C518;line-height:1">'+profiles.length+'</div>'
+        +'<div style="font-size:12px;color:#7a9a7a;margin-top:2px">usuarios registrados</div>'
+      +'</div>'
+      +'<button onclick="loadAdmin()" style="font-size:12px;padding:6px 14px;border:1px solid #2a382a;border-radius:6px;background:none;color:#7a9a7a;cursor:pointer;">Actualizar</button>'
+    +'</div>'
+    + profiles.map(p => {
+      const joinDate = p.created_at ? new Date(p.created_at).toLocaleDateString('es', { day:'numeric', month:'short', year:'numeric' }) : '—';
+      const nPreds = predCount[p.id] || 0;
+      const isMe = p.id === currentUser.id;
+      const deleteBtn = isMe ? '' :
+        '<button onclick="deleteUser(''+p.id+'',''+p.name+'')" style="'
+          +'padding:5px 10px;border:1px solid #742a2a;border-radius:6px;background:none;'
+          +'color:#fc8181;font-size:11px;cursor:pointer;white-space:nowrap;margin-top:6px;display:block;width:100%'
+        +'">Eliminar</button>';
+      return '<div class="card" id="user-card-'+p.id+'" style="'+(isMe?'border-color:#F5C518;':'')+'padding:12px 14px;">'
+        +'<div style="display:flex;align-items:center;gap:12px;">'
+          +'<div style="width:36px;height:36px;border-radius:50%;background:#006644;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#F5C518;flex-shrink:0">'+(p.nickname||p.name)[0].toUpperCase()+'</div>'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-weight:500;font-size:14px;color:#e8f0e8">'+(p.nickname?'<span style="color:#F5C518">'+p.nickname+'</span> (':'')+p.name+(p.nickname?')':'')+(isMe?' <span style="font-size:10px;color:#7a9a7a">(tú)</span>':'')+'</div>'
+            +'<div style="font-size:12px;color:#7a9a7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+( p.email||'—')+'</div>'
+          +'</div>'
+          +'<div style="text-align:right;flex-shrink:0">'
+            +'<div style="font-size:13px;color:#F5C518;font-weight:600">'+nPreds+' pronósticos</div>'
+            +'<div style="font-size:11px;color:#7a9a7a">Desde '+joinDate+'</div>'
+          +'</div>'
+        +'</div>'
+        +(deleteBtn ? '<div style="margin-top:8px;border-top:1px solid #2a382a;padding-top:8px;">'+deleteBtn+'</div>' : '')
+      +'</div>';
+    }).join('');
+}
+
+async function deleteUser(userId, userName) {
+  if (!confirm('¿Eliminar a ' + userName + '? Se borrarán también todos sus pronósticos.')) return;
+  const card = document.getElementById('user-card-' + userId);
+  if (card) card.style.opacity = '0.4';
+  // Delete predictions first (FK constraint)
+  await sb.from('predictions').delete().eq('user_id', userId);
+  // Delete profile
+  const { error } = await sb.from('profiles').delete().eq('id', userId);
+  if (error) {
+    alert('Error eliminando usuario. Puede que necesites eliminarlo desde Supabase > Authentication > Users.');
+    if (card) card.style.opacity = '1';
+    return;
+  }
+  if (card) card.remove();
+  // Update count
+  const countEl = document.querySelector('#admin-container [style*="1.8rem"]');
+  if (countEl) countEl.textContent = parseInt(countEl.textContent) - 1;
+}
+
+async function saveNickname() {
+  const nick = document.getElementById('nick-input').value.trim();
+  const msg = document.getElementById('nick-msg');
+  if (!nick) { msg.style.color='#fc8181'; msg.textContent='Ingresa un nickname'; return; }
+  const { error } = await sb.from('profiles').update({ nickname: nick }).eq('id', currentUser.id);
+  if (error) { msg.style.color='#fc8181'; msg.textContent='Error guardando'; return; }
+  currentProfile.nickname = nick;
+  document.getElementById('header-name').textContent = nick;
+  msg.style.color='#68d391';
+  msg.textContent='Nickname actualizado!';
+  setTimeout(() => { msg.textContent=''; }, 3000);
+}
+
+function toggleRanking(id) {
+  const el = document.getElementById(id);
+  const icon = document.getElementById(id + '-icon');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (icon) icon.textContent = isOpen ? '▼ Ver' : '▲ Ocultar';
+}
+
 sb.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) initApp(session.user);
 });
