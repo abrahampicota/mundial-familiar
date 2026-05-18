@@ -148,6 +148,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 </div>
 
 <script>
+window.addEventListener('DOMContentLoaded', function() {
 const SUPABASE_URL = 'https://kzomuimnoxtcfjcuqgiu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_4U3skEL7RboqhnEn8wap2w_jT3C1lMP';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -565,6 +566,7 @@ function toggleRanking(id) {
 sb.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) initApp(session.user);
 });
+}); // DOMContentLoaded
 </script>
 </body>
 </html>
