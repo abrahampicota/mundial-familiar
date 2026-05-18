@@ -21,8 +21,7 @@ nav { display: flex; gap: 4px; padding: 1rem 1.5rem 0; border-bottom: 1px solid 
 .nav-btn { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; padding: 8px 20px; border: none; background: none; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
 .nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
 main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
-.section { display: none; }
-.section.active { display: block; }
+.section { display: none; } .section.active { display: block; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
 .match-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
 .match-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -38,14 +37,22 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .badge-soon { background: #1a2a3a; color: #63b3ed; }
 .pred-section { border-top: 1px solid var(--border); padding-top: 12px; }
 .pred-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-.pred-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.pred-btn { padding: 8px 4px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--text-muted); font-size: 12px; cursor: pointer; text-align: center; }
-.pred-btn.selected { border-color: var(--gold); background: #2a2000; color: var(--gold); font-weight: 600; }
-.pred-btn.correct { border-color: #00875A; background: #0d2a1a; color: #68d391; }
-.pred-btn.wrong { border-color: #742a2a; background: #1a0d0d; color: #fc8181; }
-.pred-btn:disabled { cursor: default; }
-.family-preds { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-.family-chip { display: flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 11px; }
+.score-input-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; }
+.score-input { width: 52px; height: 48px; text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--gold); outline: none; }
+.score-input:focus { border-color: var(--gold); }
+.score-input:disabled { opacity: 0.6; cursor: default; }
+.score-sep { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--text-muted); }
+.score-team-label { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 4px; }
+.btn-save-pred { width: 100%; padding: 9px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; margin-top: 4px; }
+.btn-save-pred:disabled { opacity: 0.5; cursor: default; background: var(--surface2); color: var(--text-muted); }
+.pts-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.pts-exact { background: #1a3a2a; color: #68d391; border: 1px solid #00875A; }
+.pts-outcome { background: #2a2a0a; color: var(--gold); border: 1px solid #5a5000; }
+.pts-wrong { background: #2a0a0a; color: #fc8181; border: 1px solid #742a2a; }
+.pts-pending { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.family-preds { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.family-chip { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; }
+.family-score { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--text-muted); }
 .lb-item { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
 .lb-item.me { border-color: var(--gold); }
 .lb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; width: 36px; text-align: center; color: var(--text-muted); }
@@ -61,10 +68,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .btn-logout { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-.sync-btn { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--text-muted); cursor: pointer; float: right; }
+.legend { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; font-size: 12px; color: var(--text-muted); align-items: center; }
 #app { display: none; }
-
-/* LOGIN */
 #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 380px; text-align: center; }
 .login-logo { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--gold); letter-spacing: 3px; margin-bottom: 4px; }
@@ -73,7 +78,6 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .btn-main { width: 100%; padding: 11px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; display: block; margin-bottom: 8px; }
 .btn-sec { width: 100%; padding: 11px; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; display: block; }
 .login-err { color: #fc8181; font-size: 13px; margin-top: 8px; min-height: 20px; }
-.login-ok { color: #68d391; font-size: 13px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -82,7 +86,6 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
   <div class="login-box">
     <div class="login-logo">⚽ Mundial</div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1.5rem;">FAMILIAR 2026</div>
-
     <div id="view-login">
       <input class="input" id="l-email" type="email" placeholder="Correo electrónico" />
       <input class="input" id="l-pass" type="password" placeholder="Contraseña" />
@@ -90,7 +93,6 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       <button class="btn-sec" onclick="showRegister()">¿No tienes cuenta? Regístrate</button>
       <div class="login-err" id="login-err"></div>
     </div>
-
     <div id="view-register" style="display:none">
       <input class="input" id="r-name" type="text" placeholder="Tu nombre (aparece en la tabla)" />
       <input class="input" id="r-email" type="email" placeholder="Correo electrónico" />
@@ -117,9 +119,14 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
   </nav>
   <main>
     <div id="tab-partidos" class="section active">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
         <div class="section-title" style="margin:0">Partidos</div>
-        <button class="sync-btn" onclick="loadMatches()" style="float:none">Actualizar</button>
+        <button onclick="loadMatches()" style="font-size:12px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);cursor:pointer;">Actualizar</button>
+      </div>
+      <div class="legend">
+        <span class="pts-badge pts-exact">+5 pts</span> Marcador exacto &nbsp;
+        <span class="pts-badge pts-outcome">+3 pts</span> Ganador/empate &nbsp;
+        <span class="pts-badge pts-wrong">0 pts</span> Fallo
       </div>
       <div id="matches-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
@@ -141,7 +148,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [];
 
-// ── VIEWS ─────────────────────────────────────────────
+// ── PUNTAJE ───────────────────────────────────────────
+// 5 pts = marcador exacto, 3 pts = ganador/empate correcto, 0 = fallo
+function calcPts(pred1, pred2, real1, real2) {
+  if (real1 === null || real2 === null || pred1 === null || pred2 === null) return null;
+  if (pred1 === real1 && pred2 === real2) return 5;
+  if (getOutcome(pred1, pred2) === getOutcome(real1, real2)) return 3;
+  return 0;
+}
+
+function getOutcome(g1, g2) {
+  if (g1 === null || g2 === null) return null;
+  return g1 > g2 ? 'local' : g2 > g1 ? 'visitante' : 'empate';
+}
+
+// ── AUTH ──────────────────────────────────────────────
 function showRegister() {
   document.getElementById('view-login').style.display = 'none';
   document.getElementById('view-register').style.display = 'block';
@@ -150,8 +171,6 @@ function showLogin() {
   document.getElementById('view-register').style.display = 'none';
   document.getElementById('view-login').style.display = 'block';
 }
-
-// ── AUTH ──────────────────────────────────────────────
 async function doLogin() {
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
@@ -160,14 +179,9 @@ async function doLogin() {
   if (!email || !pass) { err.textContent = 'Ingresa correo y contraseña'; return; }
   document.getElementById('btn-login').textContent = '...';
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) {
-    err.textContent = 'Correo o contraseña incorrectos';
-    document.getElementById('btn-login').textContent = 'Entrar';
-    return;
-  }
+  if (error) { err.textContent = 'Correo o contraseña incorrectos'; document.getElementById('btn-login').textContent = 'Entrar'; return; }
   await initApp(data.user);
 }
-
 async function doRegister() {
   const name = document.getElementById('r-name').value.trim();
   const email = document.getElementById('r-email').value.trim();
@@ -179,31 +193,15 @@ async function doRegister() {
   if (pass.length < 6) { err.textContent = 'La contraseña debe tener al menos 6 caracteres'; return; }
   document.getElementById('btn-register').textContent = '...';
   const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { name } } });
-  if (error) {
-    err.textContent = error.message;
-    document.getElementById('btn-register').textContent = 'Crear cuenta';
-    return;
-  }
-  if (data.user) {
-    await ensureProfile(data.user, name);
-    await initApp(data.user);
-  } else {
-    err.style.color = '#68d391';
-    err.textContent = 'Revisa tu correo para confirmar tu cuenta.';
-    document.getElementById('btn-register').textContent = 'Crear cuenta';
-  }
+  if (error) { err.textContent = error.message; document.getElementById('btn-register').textContent = 'Crear cuenta'; return; }
+  if (data.user) { await ensureProfile(data.user, name); await initApp(data.user); }
+  else { err.style.color='#68d391'; err.textContent='Revisa tu correo para confirmar.'; document.getElementById('btn-register').textContent='Crear cuenta'; }
 }
-
 async function ensureProfile(user, name) {
   const displayName = name || user.user_metadata?.name || user.email.split('@')[0];
   await sb.from('profiles').upsert({ id: user.id, name: displayName, email: user.email }, { onConflict: 'id' });
 }
-
-async function logout() {
-  await sb.auth.signOut();
-  location.reload();
-}
-
+async function logout() { await sb.auth.signOut(); location.reload(); }
 async function initApp(user) {
   currentUser = user;
   await ensureProfile(user, user.user_metadata?.name);
@@ -229,10 +227,7 @@ function showTab(name, btn) {
 async function loadMatches() {
   document.getElementById('matches-container').innerHTML = '<div class="empty"><span class="spinner"></span> Cargando partidos...</div>';
   const { data, error } = await sb.from('matches').select('*').order('date', { ascending: true });
-  if (error || !data) {
-    document.getElementById('matches-container').innerHTML = '<div class="empty">Error cargando partidos.</div>';
-    return;
-  }
+  if (error || !data) { document.getElementById('matches-container').innerHTML = '<div class="empty">Error cargando partidos.</div>'; return; }
   allMatches = data;
   const ids = allMatches.map(m => m.id);
   const { data: preds } = await sb.from('predictions').select('*, profiles(name)').in('match_id', ids);
@@ -240,63 +235,117 @@ async function loadMatches() {
   renderMatches();
 }
 
-function getOutcome(g1, g2) {
-  if (g1 === null || g2 === null) return null;
-  return g1 > g2 ? 'local' : g2 > g1 ? 'visitante' : 'empate';
-}
-
-function predText(val, t1, t2) {
-  return val === 'local' ? t1 : val === 'visitante' ? t2 : 'Empate';
-}
-
 function renderMatches() {
   const container = document.getElementById('matches-container');
   if (!allMatches.length) { container.innerHTML = '<div class="empty">No hay partidos cargados.</div>'; return; }
-  container.innerHTML = allMatches.map(m => {
-    const myPred = allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id);
-    const done = ['FT','AET','PEN'].includes(m.status);
-    const realOutcome = done ? getOutcome(m.goals1, m.goals2) : null;
-    const dateStr = m.date ? new Date(m.date).toLocaleString('es', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
-    const scoreHtml = done
-      ? `<div class="score-box"><div class="score">${m.goals1} - ${m.goals2}</div></div>`
-      : `<div class="score-box"><div class="score" style="font-size:1rem;color:var(--text-muted)">vs</div></div>`;
-    const badgeHtml = done ? '<span class="badge badge-done">Finalizado</span>' : '<span class="badge badge-soon">Próximo</span>';
-    const opts = [
-      { val: 'local', label: m.team1 },
-      { val: 'empate', label: 'Empate' },
-      { val: 'visitante', label: m.team2 }
-    ];
-    const locked = done || !!myPred;
-    const btns = opts.map(o => {
-      let cls = '';
-      if (myPred?.prediction === o.val) cls = done ? (myPred.prediction === realOutcome ? 'correct' : 'wrong') : 'selected';
-      return `<button class="pred-btn ${cls}" onclick="savePred(${m.id},'${o.val}')" ${locked ? 'disabled' : ''}>${o.label}</button>`;
-    }).join('');
-    const matchPreds = allPredictions.filter(p => p.match_id === m.id);
-    const chips = matchPreds.map(p => {
-      let pts = done ? (p.prediction === realOutcome ? '<span style="color:#68d391;font-weight:600">+3pts</span>' : '<span style="color:#fc8181">0pts</span>') : '';
-      return `<div class="family-chip">${p.profiles?.name||'?'}: ${predText(p.prediction,m.team1,m.team2)} ${pts}</div>`;
-    }).join('');
-    return `<div class="match-card">
-      <div class="match-meta"><span class="match-group">${m.group_name||''}</span><div style="display:flex;gap:8px;align-items:center;">${badgeHtml}<span class="match-date">${dateStr}</span></div></div>
-      <div class="match-teams">
-        <div class="team-name team-left">${m.team1}</div>${scoreHtml}<div class="team-name">${m.team2}</div>
-      </div>
-      <div class="pred-section">
-        <div class="pred-title">Tu pronóstico ${myPred ? '✓' : ''}</div>
-        <div class="pred-options">${btns}</div>
-        ${chips ? `<div class="family-preds">${chips}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  container.innerHTML = allMatches.map(m => matchCard(m)).join('');
 }
 
-async function savePred(matchId, prediction) {
+function matchCard(m) {
+  const myPred = allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id);
+  const done = ['FT','AET','PEN'].includes(m.status);
+  const dateStr = m.date ? new Date(m.date).toLocaleString('es', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+  const badgeHtml = done ? '<span class="badge badge-done">Finalizado</span>' : '<span class="badge badge-soon">Próximo</span>';
+
+  const scoreHtml = done
+    ? `<div class="score-box"><div class="score">${m.goals1} - ${m.goals2}</div><div style="font-size:10px;color:var(--text-muted)">Final</div></div>`
+    : `<div class="score-box"><div class="score" style="font-size:1rem;color:var(--text-muted)">vs</div></div>`;
+
+  // Prediction input
+  let predHtml = '';
+  if (myPred) {
+    // Already predicted — show result
+    const pts = done ? calcPts(myPred.pred_goals1, myPred.pred_goals2, m.goals1, m.goals2) : null;
+    let ptsBadge = '';
+    if (pts === 5) ptsBadge = '<span class="pts-badge pts-exact">+5 pts ⭐ Exacto!</span>';
+    else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3 pts ✓ Ganador</span>';
+    else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0 pts ✗</span>';
+    else ptsBadge = '<span class="pts-badge pts-pending">Pendiente</span>';
+    predHtml = `
+      <div style="text-align:center;padding:8px 0;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Tu pronóstico</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);margin-bottom:6px;">${myPred.pred_goals1} - ${myPred.pred_goals2}</div>
+        ${ptsBadge}
+      </div>`;
+  } else if (!done) {
+    // Show input form
+    predHtml = `
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center;">¿Cuál será el marcador?</div>
+        <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:10px;">
+          <div style="text-align:center;">
+            <div class="score-team-label">${m.team1}</div>
+            <input class="score-input" id="g1-${m.id}" type="number" min="0" max="20" placeholder="0" />
+          </div>
+          <div class="score-sep" style="margin-bottom:8px;">-</div>
+          <div style="text-align:center;">
+            <div class="score-team-label">${m.team2}</div>
+            <input class="score-input" id="g2-${m.id}" type="number" min="0" max="20" placeholder="0" />
+          </div>
+        </div>
+        <button class="btn-save-pred" onclick="savePred(${m.id})">Guardar pronóstico</button>
+      </div>`;
+  } else {
+    predHtml = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">No hiciste un pronóstico para este partido</div>`;
+  }
+
+  // Family predictions
+  const matchPreds = allPredictions.filter(p => p.match_id === m.id && p.user_id !== currentUser.id);
+  const chipsHtml = matchPreds.map(p => {
+    const pts = done ? calcPts(p.pred_goals1, p.pred_goals2, m.goals1, m.goals2) : null;
+    let ptsBadge = '';
+    if (pts === 5) ptsBadge = '<span class="pts-badge pts-exact">+5</span>';
+    else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3</span>';
+    else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0</span>';
+    else ptsBadge = '<span class="pts-badge pts-pending">—</span>';
+    return `<div class="family-chip">
+      <span style="font-weight:500">${p.profiles?.name||'?'}</span>
+      <span class="family-score">${p.pred_goals1} - ${p.pred_goals2}</span>
+      ${ptsBadge}
+    </div>`;
+  }).join('');
+
+  return `<div class="match-card">
+    <div class="match-meta">
+      <span class="match-group">${m.group_name||''}</span>
+      <div style="display:flex;gap:8px;align-items:center;">${badgeHtml}<span class="match-date">${dateStr}</span></div>
+    </div>
+    <div class="match-teams">
+      <div class="team-name team-left">${m.team1}</div>
+      ${scoreHtml}
+      <div class="team-name">${m.team2}</div>
+    </div>
+    <div class="pred-section">
+      ${predHtml}
+      ${chipsHtml ? `<div style="margin-top:10px;font-size:11px;color:var(--text-muted);margin-bottom:6px;">PRONÓSTICOS DE TU FAMILIA</div><div class="family-preds">${chipsHtml}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+async function savePred(matchId) {
+  const g1Input = document.getElementById('g1-' + matchId);
+  const g2Input = document.getElementById('g2-' + matchId);
+  if (!g1Input || !g2Input) return;
+  const g1 = parseInt(g1Input.value);
+  const g2 = parseInt(g2Input.value);
+  if (isNaN(g1) || isNaN(g2) || g1 < 0 || g2 < 0) {
+    alert('Ingresa un marcador válido (números iguales o mayores a 0)');
+    return;
+  }
   if (allPredictions.find(p => p.match_id === matchId && p.user_id === currentUser.id)) return;
-  const { error } = await sb.from('predictions').insert({ match_id: matchId, user_id: currentUser.id, prediction });
+  const { error } = await sb.from('predictions').insert({
+    match_id: matchId,
+    user_id: currentUser.id,
+    pred_goals1: g1,
+    pred_goals2: g2,
+    prediction: getOutcome(g1, g2)
+  });
   if (!error) {
-    allPredictions.push({ match_id: matchId, user_id: currentUser.id, prediction, profiles: { name: currentProfile?.name } });
+    allPredictions.push({ match_id: matchId, user_id: currentUser.id, pred_goals1: g1, pred_goals2: g2, prediction: getOutcome(g1,g2), profiles: { name: currentProfile?.name } });
     renderMatches();
+  } else {
+    alert('Error guardando. Intenta de nuevo.');
+    console.error(error);
   }
 }
 
@@ -308,21 +357,30 @@ async function loadLeaderboard() {
   if (!profiles) return;
   const scores = profiles.map(p => {
     const myPreds = (preds||[]).filter(x => x.user_id === p.id);
-    let pts = 0, correct = 0, played = 0;
+    let pts = 0, exact = 0, outcome = 0, played = 0;
     myPreds.forEach(x => {
       if (!x.matches || !['FT','AET','PEN'].includes(x.matches.status)) return;
       played++;
-      if (x.prediction === getOutcome(x.matches.goals1, x.matches.goals2)) { pts += 3; correct++; }
+      const p2 = calcPts(x.pred_goals1, x.pred_goals2, x.matches.goals1, x.matches.goals2);
+      pts += p2 || 0;
+      if (p2 === 5) exact++;
+      else if (p2 === 3) outcome++;
     });
-    return { ...p, pts, correct, played };
+    return { ...p, pts, exact, outcome, played };
   }).sort((a,b) => b.pts - a.pts);
   const medals = ['🥇','🥈','🥉'];
-  document.getElementById('lb-container').innerHTML = scores.map((s,i) => `
+  document.getElementById('lb-container').innerHTML = `
+    <div style="display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px;font-size:11px;color:var(--text-muted);padding:0 14px 8px;">
+      <span>#</span><span></span><span>Jugador</span><span style="text-align:center">⭐ Exactos</span><span style="text-align:right">Pts</span>
+    </div>
+    ` + scores.map((s,i) => `
     <div class="lb-item ${s.id === currentUser.id ? 'me' : ''}">
       <div class="lb-rank">${medals[i]||i+1}</div>
       <div class="lb-avatar">${s.name[0].toUpperCase()}</div>
-      <div style="flex:1"><div style="font-weight:500">${s.name} ${s.id===currentUser.id?'<span style="font-size:11px;color:var(--text-muted)">(tú)</span>':''}</div>
-      <div style="font-size:12px;color:var(--text-muted)">${s.correct} aciertos de ${s.played} jugados</div></div>
+      <div style="flex:1">
+        <div style="font-weight:500">${s.name} ${s.id===currentUser.id?'<span style="font-size:11px;color:var(--text-muted)">(tú)</span>':''}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${s.exact} exactos · ${s.outcome} ganador · ${s.played} jugados</div>
+      </div>
       <div style="text-align:right"><div class="lb-pts-num">${s.pts}</div><div class="lb-pts-label">pts</div></div>
     </div>`).join('');
 }
@@ -330,39 +388,52 @@ async function loadLeaderboard() {
 // ── PROFILE ───────────────────────────────────────────
 async function renderProfile() {
   const { data: preds } = await sb.from('predictions').select('*, matches(status,goals1,goals2,team1,team2)').eq('user_id', currentUser.id);
-  const done = (preds||[]).filter(p => p.matches && ['FT','AET','PEN'].includes(p.matches.status));
-  const correct = done.filter(p => p.prediction === getOutcome(p.matches.goals1, p.matches.goals2));
-  const pts = correct.length * 3;
+  let totalPts = 0, exact = 0, outcome = 0, played = 0;
+  (preds||[]).forEach(p => {
+    if (!p.matches || !['FT','AET','PEN'].includes(p.matches.status)) return;
+    played++;
+    const pts = calcPts(p.pred_goals1, p.pred_goals2, p.matches.goals1, p.matches.goals2);
+    totalPts += pts || 0;
+    if (pts === 5) exact++;
+    else if (pts === 3) outcome++;
+  });
   document.getElementById('profile-container').innerHTML = `
     <div class="card" style="text-align:center;border-color:var(--gold);margin-bottom:1rem;">
       <div class="lb-avatar" style="margin:0 auto 10px;width:60px;height:60px;font-size:1.5rem;">${currentProfile?.name?.[0]?.toUpperCase()||'?'}</div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;">${currentProfile?.name||''}</div>
       <div style="font-size:13px;color:var(--text-muted)">${currentProfile?.email||''}</div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-num">${pts}</div><div class="stat-label">Puntos</div></div>
-      <div class="stat-card"><div class="stat-num">${correct.length}/${done.length}</div><div class="stat-label">Aciertos</div></div>
-      <div class="stat-card"><div class="stat-num">${done.length ? Math.round(correct.length/done.length*100) : 0}%</div><div class="stat-label">Precisión</div></div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-num">${totalPts}</div><div class="stat-label">Puntos</div></div>
+      <div class="stat-card"><div class="stat-num">${exact}</div><div class="stat-label">⭐ Exactos</div></div>
+      <div class="stat-card"><div class="stat-num">${outcome}</div><div class="stat-label">Ganador</div></div>
+      <div class="stat-card"><div class="stat-num">${played}</div><div class="stat-label">Jugados</div></div>
     </div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--text-muted);margin-bottom:10px;">MIS PRONÓSTICOS</div>
-    ${(preds||[]).length === 0 ? '<div class="empty">Aún no tienes pronósticos.</div>' :
+    ${!(preds||[]).length ? '<div class="empty">Aún no tienes pronósticos.</div>' :
       (preds||[]).map(p => {
         if (!p.matches) return '';
         const isDone = ['FT','AET','PEN'].includes(p.matches.status);
-        const isCorrect = isDone && p.prediction === getOutcome(p.matches.goals1, p.matches.goals2);
+        const pts = isDone ? calcPts(p.pred_goals1, p.pred_goals2, p.matches.goals1, p.matches.goals2) : null;
+        let ptsBadge = '';
+        if (pts===5) ptsBadge='<span class="pts-badge pts-exact">+5 ⭐</span>';
+        else if (pts===3) ptsBadge='<span class="pts-badge pts-outcome">+3 ✓</span>';
+        else if (pts===0) ptsBadge='<span class="pts-badge pts-wrong">0 pts</span>';
+        else ptsBadge='<span class="pts-badge pts-pending">Pendiente</span>';
         return `<div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;">
-          <div><div style="font-size:14px;font-weight:500">${p.matches.team1} vs ${p.matches.team2}</div>
-          <div style="font-size:11px;color:var(--gold);margin-top:4px">Elegí: ${predText(p.prediction,p.matches.team1,p.matches.team2)}</div></div>
-          ${isDone ? `<span class="badge ${isCorrect?'badge-done':'badge-live'}" style="${!isCorrect?'background:#3a1d1d;color:#fc8181':''}">${isCorrect?'+3 pts':'0 pts'}</span>` : '<span class="badge badge-soon">Pendiente</span>'}
+          <div>
+            <div style="font-size:14px;font-weight:500">${p.matches.team1} vs ${p.matches.team2}</div>
+            <div style="font-size:13px;color:var(--gold);font-family:'Bebas Neue',sans-serif;margin-top:2px;">Pronostiqué: ${p.pred_goals1} - ${p.pred_goals2}</div>
+            ${isDone ? `<div style="font-size:12px;color:var(--text-muted)">Real: ${p.matches.goals1} - ${p.matches.goals2}</div>` : ''}
+          </div>
+          ${ptsBadge}
         </div>`;
       }).join('')}`;
 }
 
 // ── INIT ──────────────────────────────────────────────
 sb.auth.getSession().then(({ data: { session } }) => {
-  if (session?.user) {
-    initApp(session.user);
-  }
+  if (session?.user) initApp(session.user);
 });
 </script>
 </body>
