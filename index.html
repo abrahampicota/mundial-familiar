@@ -78,10 +78,34 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .btn-main { width: 100%; padding: 11px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; display: block; margin-bottom: 8px; }
 .btn-sec { width: 100%; padding: 11px; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; display: block; }
 .login-err { color: #fc8181; font-size: 13px; margin-top: 8px; min-height: 20px; }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 320px; text-align: center; }
+.toast.show { opacity: 1; }
+.toast-error { background: #2a0808; border: 1px solid #742a2a; color: #fc8181; }
+.toast-ok { background: #0d2a1a; border: 1px solid #00875A; color: #68d391; }
+.toast-info { background: #1a1a05; border: 1px solid #5a5000; color: #F5C518; }
+.confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.confirm-box { background: #111811; border: 1px solid #2a382a; border-radius: 14px; padding: 1.5rem; max-width: 320px; width: 100%; text-align: center; }
+.confirm-title { font-size: 15px; font-weight: 600; color: #e8f0e8; margin-bottom: 8px; }
+.confirm-msg { font-size: 13px; color: #7a9a7a; margin-bottom: 1.25rem; line-height: 1.5; }
+.confirm-btns { display: flex; gap: 8px; }
+.confirm-btn-cancel { flex: 1; padding: 9px; border: 1px solid #2a382a; border-radius: 8px; background: none; color: #7a9a7a; font-size: 14px; cursor: pointer; }
+.confirm-btn-ok { flex: 1; padding: 9px; border: none; border-radius: 8px; background: #742a2a; color: #fc8181; font-size: 14px; font-weight: 600; cursor: pointer; }
 </style>
 </head>
 <body>
 
+<div id="toast" class="toast"></div>
+<div id="confirm-overlay" class="confirm-overlay" style="display:none">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">¿Estás seguro?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="confirmResolve(false)">Cancelar</button>
+      <button class="confirm-btn-ok" onclick="confirmResolve(true)">Eliminar</button>
+    </div>
+  </div>
+</div>
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">⚽ Mundial</div>
@@ -363,7 +387,7 @@ async function savePred(matchId) {
   const g1 = parseInt(g1Input.value);
   const g2 = parseInt(g2Input.value);
   if (isNaN(g1) || isNaN(g2) || g1 < 0 || g2 < 0) {
-    alert('Ingresa un marcador válido (números iguales o mayores a 0)');
+    showToast('Ingresa un marcador para los dos equipos (0 o más goles)', 'error'); return;
     return;
   }
   if (allPredictions.find(p => p.match_id === matchId && p.user_id === currentUser.id)) return;
@@ -378,7 +402,7 @@ async function savePred(matchId) {
     allPredictions.push({ match_id: matchId, user_id: currentUser.id, pred_goals1: g1, pred_goals2: g2, prediction: getOutcome(g1,g2), profiles: { name: currentProfile?.name } });
     renderMatches();
   } else {
-    alert('Error guardando. Intenta de nuevo.');
+    showToast('Error guardando el pronóstico. Intenta de nuevo.', 'error');
     console.error(error);
   }
 }
@@ -524,7 +548,7 @@ async function loadAdmin() {
 async function deleteUser(btn) {
   const userId = btn.dataset.uid;
   const userName = btn.dataset.uname;
-  if (!confirm('¿Eliminar a ' + userName + '? Se borrarán también todos sus pronósticos.')) return;
+  const ok = await confirmDialog('Eliminar a ' + userName, 'Se borrarán también todos sus pronósticos. Esta acción no se puede deshacer.'); if (!ok) return;
   const card = document.getElementById('user-card-' + userId);
   if (card) card.style.opacity = '0.4';
   // Delete predictions first (FK constraint)
@@ -532,7 +556,7 @@ async function deleteUser(btn) {
   // Delete profile
   const { error } = await sb.from('profiles').delete().eq('id', userId);
   if (error) {
-    alert('Error eliminando usuario. Puede que necesites eliminarlo desde Supabase > Authentication > Users.');
+    showToast('Error eliminando usuario. Bórralo desde Supabase > Authentication > Users.', 'error');
     if (card) card.style.opacity = '1';
     return;
   }
@@ -553,6 +577,27 @@ async function saveNickname() {
   msg.style.color='#68d391';
   msg.textContent='Nickname actualizado!';
   setTimeout(() => { msg.textContent=''; }, 3000);
+}
+
+let confirmResolve = null;
+
+function showToast(msg, type = 'info') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast toast-' + type + ' show';
+  setTimeout(() => { toast.classList.remove('show'); }, 3500);
+}
+
+function confirmDialog(title, msg) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-overlay').style.display = 'flex';
+    confirmResolve = (val) => {
+      document.getElementById('confirm-overlay').style.display = 'none';
+      resolve(val);
+    };
+  });
 }
 
 function toggleRanking(btn) {
