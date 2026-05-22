@@ -301,25 +301,53 @@ async function syncResultsFromAPI() {
     const updates = json.response.filter(f => liveStatuses.includes(f.fixture.status.short));
     if (!updates.length) return;
 
-    // Match API results to our matches by team names (not by ID)
+    // Match API results to our matches
     for (const f of updates) {
       const apiTeam1 = f.teams.home.name;
       const apiTeam2 = f.teams.away.name;
-      // Find our match by comparing team names loosely
-      const local = allMatches.find(m =>
-        m.team1.toLowerCase().includes(apiTeam1.toLowerCase().split(' ')[0]) ||
-        apiTeam1.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
-      );
+      const apiDate = f.fixture.date.split('T')[0];
+
+      // Find match by date + teams or by placeholder pattern
+      let local = allMatches.find(m => {
+        const mDate = new Date(m.date).toISOString().split('T')[0];
+        return mDate === apiDate && (
+          m.team1.toLowerCase().includes(apiTeam1.toLowerCase().split(' ')[0]) ||
+          apiTeam1.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
+        );
+      });
+
+      // For knockout rounds, match by date only if teams are still placeholders
+      if (!local) {
+        local = allMatches.find(m => {
+          const mDate = new Date(m.date).toISOString().split('T')[0];
+          return mDate === apiDate && (
+            m.team1.startsWith('Ganador') || m.team1.startsWith('1') || m.team1.startsWith('2') || m.team1.startsWith('3')
+          );
+        });
+      }
+
       if (!local) continue;
-      // Only update result fields, never overwrite teams or group
-      await sb.from('matches').update({
+
+      const updateData = {
         status: f.fixture.status.short,
         goals1: f.goals.home,
         goals2: f.goals.away
-      }).eq('id', local.id);
-      local.status = f.fixture.status.short;
-      local.goals1 = f.goals.home;
-      local.goals2 = f.goals.away;
+      };
+
+      // Update team names if they are still placeholders
+      const isPlaceholder = local.team1.startsWith('Ganador') || local.team1.startsWith('1') ||
+                            local.team1.startsWith('2') || local.team1.startsWith('3') ||
+                            local.team1.startsWith('Perdedor');
+      if (isPlaceholder) {
+        updateData.team1 = apiTeam1;
+        updateData.team2 = apiTeam2;
+      }
+
+      await sb.from('matches').update(updateData).eq('id', local.id);
+      local.status = updateData.status;
+      local.goals1 = updateData.goals1;
+      local.goals2 = updateData.goals2;
+      if (isPlaceholder) { local.team1 = apiTeam1; local.team2 = apiTeam2; }
     }
     console.log('Synced results from API');
   } catch(e) {
@@ -367,58 +395,102 @@ function renderMatches() {
   // DOM state takes priority if elements exist, otherwise use stored
   const collapsed = Object.keys(domState).length > 0 ? domState : storedState;
 
-  // Group matches by day (Panama time UTC-5)
-  const groups = {};
+  // Round order
+  const roundOrder = ['Grupos','Dieciseisavos','Octavos','Cuartos','Semifinal','Tercer Puesto','Final'];
+  const roundLabels = {
+    'Grupos': '⚽ Fase de Grupos',
+    'Dieciseisavos': '⚔️ Dieciseisavos de Final',
+    'Octavos': '🏟️ Octavos de Final',
+    'Cuartos': '🔥 Cuartos de Final',
+    'Semifinal': '⭐ Semifinales',
+    'Tercer Puesto': '🥉 Tercer Puesto',
+    'Final': '🏆 Gran Final'
+  };
+
+  // Group by round, then by day within round
+  const byRound = {};
   allMatches.forEach(m => {
+    const round = m.round || 'Grupos';
+    if (!byRound[round]) byRound[round] = {};
     const d = new Date(m.date);
-    // Convert to Panama time (UTC-5)
     const panamaDate = new Date(d.getTime() - 5 * 60 * 60 * 1000);
     const key = panamaDate.toISOString().split('T')[0];
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(m);
+    if (!byRound[round][key]) byRound[round][key] = [];
+    byRound[round][key].push(m);
   });
 
   const today = new Date();
   const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  container.innerHTML = Object.keys(groups).sort().map(day => {
-    const matches = groups[day];
-    const date = new Date(day + 'T12:00:00');
-    const dayStr = date.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
-    const dayStrCap = dayStr.charAt(0).toUpperCase() + dayStr.slice(1);
-    const isToday = day === todayPanama;
-    const hasLive = matches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
-    const hasDone = matches.every(m => ['FT','AET','PEN'].includes(m.status));
-    const myPreds = matches.filter(m => allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id)).length;
+  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+    const days = byRound[round];
+    const roundId = 'round-' + round.replace(/ /g,'_');
+    const allRoundMatches = Object.values(days).flat();
+    const hasLiveRound = allRoundMatches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
+    const allDoneRound = allRoundMatches.every(m => ['FT','AET','PEN'].includes(m.status));
+    const myRoundPreds = allRoundMatches.filter(m => allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id)).length;
+    const isGroupsRound = round === 'Grupos';
 
-    // Auto-expand today and days with live matches; collapse past days
-    const isPast = day < todayPanama && !hasLive;
-    const isOpen = !isPast || isToday || hasLive;
+    // Round collapsed state
+    const wasRoundCollapsed = collapsed[roundId];
+    const roundOpen = wasRoundCollapsed !== undefined ? !wasRoundCollapsed : true;
 
-    let badge = '';
-    if (hasLive) badge = '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;font-size:10px;">⚽ EN VIVO</span>';
-    else if (isToday) badge = '<span class="badge badge-soon" style="font-size:10px;">HOY</span>';
-    else if (hasDone) badge = '<span class="badge badge-done" style="font-size:10px;">Finalizado</span>';
+    const roundDaysHtml = Object.keys(days).sort().map(day => {
+      const matches = days[day];
+      const date = new Date(day + 'T12:00:00');
+      const dayStr = date.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+      const dayStrCap = dayStr.charAt(0).toUpperCase() + dayStr.slice(1);
+      const isToday = day === todayPanama;
+      const hasLive = matches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
+      const hasDone = matches.every(m => ['FT','AET','PEN'].includes(m.status));
+      const myPreds = matches.filter(m => allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id)).length;
+      const isPast = day < todayPanama && !hasLive;
+      const isOpen = !isPast || isToday || hasLive;
 
-    const predBadge = myPreds > 0 ? '<span style="font-size:10px;color:#F5C518">'+myPreds+'/'+matches.length+' ✓</span>' : '<span style="font-size:10px;color:#7a9a7a">0/'+matches.length+' pronósticos</span>';
+      let badge = '';
+      if (hasLive) badge = '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;font-size:10px;">⚽ EN VIVO</span>';
+      else if (isToday) badge = '<span class="badge badge-soon" style="font-size:10px;">HOY</span>';
+      else if (hasDone) badge = '<span class="badge badge-done" style="font-size:10px;">Finalizado</span>';
 
-    // Check if user had this day collapsed before
-    const wasCollapsed = collapsed['day-'+day];
-    const finalOpen = wasCollapsed !== undefined ? !wasCollapsed : isOpen;
+      const predBadge = myPreds > 0 ? '<span style="font-size:10px;color:#F5C518">'+myPreds+'/'+matches.length+' ✓</span>' : '<span style="font-size:10px;color:#7a9a7a">0/'+matches.length+'</span>';
+      const wasCollapsedDay = collapsed['day-'+day];
+      const finalOpen = wasCollapsedDay !== undefined ? !wasCollapsedDay : isOpen;
 
-    return '<div class="day-group">'
-      + '<div class="day-header" data-target="day-'+day+'" onclick="toggleDay(this)">'
-        + '<div style="display:flex;align-items:center;gap:8px;">'
-          + '<div class="day-title">'+dayStrCap+'</div>'
-          + badge
+      return '<div class="day-group" style="margin-left:0">'
+        + '<div class="day-header" style="background:#0f1a0f;border-radius:8px;" data-target="day-'+day+'" onclick="toggleDay(this)">'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<div class="day-title" style="font-size:0.95rem;">'+dayStrCap+'</div>'
+            + badge
+          + '</div>'
+          + '<div class="day-meta">'
+            + predBadge
+            + '<span class="day-arrow '+(finalOpen?'open':'')+'" id="arrow-'+day+'">▼</span>'
+          + '</div>'
         + '</div>'
-        + '<div class="day-meta">'
-          + predBadge
-          + '<span class="day-arrow '+(finalOpen?'open':'')+'" id="arrow-'+day+'">▼</span>'
+        + '<div id="day-'+day+'" style="display:'+(finalOpen?'block':'none')+';">'
+          + matches.map(m => matchCard(m)).join('')
+        + '</div>'
+      + '</div>';
+    }).join('');
+
+    const roundPredBadge = myRoundPreds > 0
+      ? '<span style="font-size:11px;color:#F5C518">'+myRoundPreds+'/'+allRoundMatches.length+' ✓</span>'
+      : '<span style="font-size:11px;color:#7a9a7a">'+allRoundMatches.length+' partidos</span>';
+
+    return '<div style="margin-bottom:12px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border:1px solid '+(hasLiveRound?'#742a2a':allDoneRound?'#1d3a1d':'var(--gold)')+';border-radius:12px;cursor:pointer;margin-bottom:6px;" data-target="'+roundId+'" onclick="toggleDay(this)">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<div style="font-family:Bebas Neue,sans-serif;font-size:1.2rem;letter-spacing:1px;color:#F5C518;">'+roundLabels[round]+'</div>'
+          + (hasLiveRound ? '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;font-size:10px;">EN VIVO</span>' : '')
+          + (allDoneRound ? '<span class="badge badge-done" style="font-size:10px;">Completado</span>' : '')
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+          + roundPredBadge
+          + '<span class="day-arrow '+(roundOpen?'open':'')+'" id="arrow-'+roundId+'">▼</span>'
         + '</div>'
       + '</div>'
-      + '<div id="day-'+day+'" style="display:'+(finalOpen?'block':'none')+';">'
-        + matches.map(m => matchCard(m)).join('')
+      + '<div id="'+roundId+'" style="display:'+(roundOpen?'block':'none')+';">'
+        + roundDaysHtml
       + '</div>'
     + '</div>';
   }).join('');
@@ -446,6 +518,33 @@ function toggleDay(btn) {
   saveCollapsedToStorage(state);
 }
 
+// Round activation dates (UTC) - opens when previous round starts
+const ROUND_DATES = {
+  'Grupos':        { start: new Date('2026-06-11T18:00:00Z'), deadline: new Date('2026-06-11T18:00:00Z') },
+  'Dieciseisavos': { start: new Date('2026-07-02T00:00:00Z'), deadline: new Date('2026-07-02T17:00:00Z') },
+  'Octavos':       { start: new Date('2026-07-11T00:00:00Z'), deadline: new Date('2026-07-11T17:00:00Z') },
+  'Cuartos':       { start: new Date('2026-07-17T00:00:00Z'), deadline: new Date('2026-07-17T17:00:00Z') },
+  'Semifinal':     { start: new Date('2026-07-21T00:00:00Z'), deadline: new Date('2026-07-21T17:00:00Z') },
+  'Tercer Puesto': { start: new Date('2026-07-25T00:00:00Z'), deadline: new Date('2026-07-25T17:00:00Z') },
+  'Final':         { start: new Date('2026-07-26T00:00:00Z'), deadline: new Date('2026-07-26T17:00:00Z') },
+};
+
+function isRoundActive(round) {
+  const rd = ROUND_DATES[round];
+  if (!rd) return false;
+  return new Date() >= rd.start;
+}
+
+function getRoundDeadline(round) {
+  const rd = ROUND_DATES[round];
+  return rd ? rd.deadline : new Date('2026-06-11T18:00:00Z');
+}
+
+function getRoundStartDate(round) {
+  const rd = ROUND_DATES[round];
+  return rd ? rd.start : null;
+}
+
 function matchCard(m) {
   const myPred = allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id);
   const done = ['FT','AET','PEN'].includes(m.status);
@@ -471,8 +570,9 @@ function matchCard(m) {
     else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3 pts ✓ Ganador</span>';
     else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0 pts ✗</span>';
     else ptsBadge = '<span class="pts-badge pts-pending">Pendiente</span>';
-    const deadline = new Date('2026-06-11T05:00:00Z');
-    const canEdit = new Date() < deadline && !done;
+    const deadline = getRoundDeadline(m.round || 'Grupos');
+    const roundActive = isRoundActive(m.round || 'Grupos');
+    const canEdit = roundActive && new Date() < deadline && !done;
     const borderColor = pts === 5 ? '#00875A' : pts === 3 ? '#5a5000' : pts === 0 ? '#742a2a' : '#00875A';
     const bgColor = pts === 5 ? '#0d2a1a' : pts === 3 ? '#1a1a05' : pts === 0 ? '#1a0808' : '#0d2a1a';
     predHtml = `
@@ -487,8 +587,9 @@ function matchCard(m) {
       </div>`;
   } else if (!done) {
     // Can edit until June 11 2026 00:00 UTC-5 (Panama)
-    const deadline = new Date('2026-06-11T05:00:00Z');
-    const canEdit = new Date() < deadline;
+    const deadline = getRoundDeadline(m.round || 'Grupos');
+    const roundActive = isRoundActive(m.round || 'Grupos');
+    const canEdit = roundActive && new Date() < deadline;
     predHtml = `
       <div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center;">¿Cuál será el marcador?</div>
@@ -510,6 +611,26 @@ function matchCard(m) {
       </div>`;
   } else {
     predHtml = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">No hiciste un pronóstico para este partido</div>`;
+  }
+
+  // If round not active yet, override predHtml with locked message
+  const roundActive2 = isRoundActive(m.round || 'Grupos');
+  const matchTeamsConfirmed = !m.team1.startsWith('Ganador') && !m.team1.startsWith('1') &&
+    !m.team1.startsWith('2') && !m.team1.startsWith('3') && !m.team1.startsWith('Perdedor');
+  if (!roundActive2 && !done) {
+    const roundStart = getRoundStartDate(m.round || 'Grupos');
+    const dateStr2 = roundStart ? roundStart.toLocaleDateString('es', { day:'numeric', month:'long' }) : '';
+    predHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:12px;">
+      <div style="font-size:20px;margin-bottom:6px;">🔒</div>
+      <div style="font-size:13px;color:#F5C518;font-weight:500;">Pronósticos disponibles desde el ${dateStr2}</div>
+      <div style="font-size:11px;color:#7a9a7a;margin-top:4px;">Los equipos se confirmarán al avanzar la ronda anterior</div>
+    </div>`;
+  } else if (!matchTeamsConfirmed && !done) {
+    predHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:12px;">
+      <div style="font-size:20px;margin-bottom:6px;">⏳</div>
+      <div style="font-size:13px;color:#F5C518;font-weight:500;">Equipos por confirmarse</div>
+      <div style="font-size:11px;color:#7a9a7a;margin-top:4px;">Disponible cuando avance la ronda anterior</div>
+    </div>`;
   }
 
   // All predictions sorted by pts — collapsible mini-ranking
