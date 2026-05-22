@@ -174,6 +174,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <button class="nav-btn active" onclick="showTab('partidos',this)">Partidos</button>
     <button class="nav-btn" onclick="showTab('tabla',this)">Tabla</button>
     <button class="nav-btn" onclick="showTab('perfil',this)">Mi perfil</button>
+    <button class="nav-btn" onclick="showTab('campeon',this)">🏆 Campeón</button>
     <button class="nav-btn" id="nav-admin" style="display:none" onclick="showTab('admin',this)">Admin</button>
   </nav>
   <main>
@@ -196,6 +197,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <div id="tab-perfil" class="section">
       <div class="section-title">Mi perfil</div>
       <div id="profile-container"></div>
+    </div>
+    <div id="tab-campeon" class="section">
+      <div class="section-title">🏆 Predicción del Campeón</div>
+      <div id="campeon-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
     <div id="tab-admin" class="section">
       <div class="section-title">Admin</div>
@@ -323,6 +328,7 @@ function showTab(name, btn) {
   if (name === 'tabla') loadLeaderboard();
   if (name === 'perfil') renderProfile();
   if (name === 'admin') loadAdmin();
+  if (name === 'campeon') loadCampeon();
 }
 
 // ── MATCHES ───────────────────────────────────────────
@@ -543,6 +549,91 @@ function renderMatches() {
       + '</div>'
     + '</div>';
   }).join('');
+}
+
+// ── CHAMPION PREDICTION ───────────────────────────────
+async function loadCampeon() {
+  const container = document.getElementById('campeon-container');
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando...</div>';
+
+  const { data: picks } = await sb.from('champion_picks').select('*, profiles(name,nickname)');
+  const myPick = (picks||[]).find(p => p.user_id === currentUser.id);
+  const deadline = new Date('2026-06-11T18:00:00Z');
+  const canPick = new Date() < deadline;
+
+  // Get teams from group stage
+  const teams = [...new Set(
+    allMatches.filter(m => m.round === 'Grupos').flatMap(m => [m.team1, m.team2])
+  )].filter(t => t && !t.startsWith('Por') && !t.startsWith('Ganador')).sort();
+
+  // My pick section
+  let myPickHtml = '';
+  if (myPick) {
+    myPickHtml = '<div style="background:#0d2a1a;border:1px solid #00875A;border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1rem;">'
+      + '<div style="font-size:11px;color:#7a9a7a;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Tu predicción</div>'
+      + '<div style="font-family:Bebas Neue,sans-serif;font-size:2.2rem;color:#F5C518;margin-bottom:4px;">' + myPick.team + '</div>'
+      + (canPick
+        ? '<div style="font-size:12px;color:#68d391;">✓ Guardado · <span onclick="deletePick()" style="color:#fc8181;cursor:pointer;text-decoration:underline;">Cambiar</span></div>'
+        : '<div style="font-size:12px;color:#68d391;">✓ Guardado · Plazo cerrado</div>')
+      + '</div>';
+  } else if (canPick) {
+    const opts = teams.map(t => '<option value="'+t+'">'+t+'</option>').join('');
+    myPickHtml = '<div class="card" style="margin-bottom:1rem;">'
+      + '<div style="font-size:13px;color:#7a9a7a;margin-bottom:4px;">¿Quién ganará el Mundial 2026?</div>'
+      + '<div style="font-size:11px;color:#F5C518;margin-bottom:12px;">⭐ +10 puntos si aciertas el campeón</div>'
+      + '<select id="champion-select" style="width:100%;padding:10px;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#e8f0e8;font-size:14px;margin-bottom:10px;">'
+      + '<option value="">— Elige un equipo —</option>'
+      + opts
+      + '</select>'
+      + '<button onclick="savePick()" style="width:100%;padding:10px;background:#F5C518;color:#0a0f0a;border:none;border-radius:8px;font-weight:600;font-size:15px;cursor:pointer;">Guardar predicción 🏆</button>'
+      + '</div>';
+  } else {
+    myPickHtml = '<div class="card" style="text-align:center;margin-bottom:1rem;">'
+      + '<div style="font-size:24px;margin-bottom:8px;">🔒</div>'
+      + '<div style="color:#7a9a7a;font-size:13px;">El plazo para predecir el campeón cerró el 11 de junio</div>'
+      + '</div>';
+  }
+
+  // Family picks
+  let picksHtml = '';
+  if ((picks||[]).length > 0) {
+    // Count votes per team
+    const votes = {};
+    (picks||[]).forEach(p => { votes[p.team] = (votes[p.team]||0) + 1; });
+    const maxVotes = Math.max(...Object.values(votes));
+
+    picksHtml = '<div style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#7a9a7a;margin-bottom:10px;letter-spacing:1px;">PREDICCIONES DE LA FAMILIA</div>'
+      + (picks||[]).map(p => {
+        const isMe = p.user_id === currentUser.id;
+        const nick = p.profiles?.nickname || p.profiles?.name || '?';
+        return '<div class="lb-item' + (isMe?' me':'') + '" style="margin-bottom:8px;">'
+          + '<div class="lb-avatar">' + nick[0].toUpperCase() + '</div>'
+          + '<div style="flex:1"><div style="font-weight:500">' + nick + (isMe?' <span style="font-size:11px;color:#7a9a7a">(tú)</span>':'') + '</div></div>'
+          + '<div style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#F5C518;">' + p.team + '</div>'
+          + '</div>';
+      }).join('');
+  } else {
+    picksHtml = '<div class="empty">Nadie ha hecho su predicción aún.<br>¡Sé el primero!</div>';
+  }
+
+  container.innerHTML = myPickHtml + picksHtml;
+}
+
+async function savePick() {
+  const select = document.getElementById('champion-select');
+  const team = select ? select.value : '';
+  if (!team) { showToast('Elige un equipo primero', 'error'); return; }
+  const { error } = await sb.from('champion_picks').upsert({ user_id: currentUser.id, team }, { onConflict: 'user_id' });
+  if (error) { showToast('Error guardando. Intenta de nuevo.', 'error'); return; }
+  showToast('¡Predicción guardada! 🏆', 'ok');
+  loadCampeon();
+}
+
+async function deletePick() {
+  const ok = await confirmDialog('¿Cambiar predicción?', 'Se borrará tu predicción actual y podrás elegir otra antes del 11 de junio.');
+  if (!ok) return;
+  await sb.from('champion_picks').delete().eq('user_id', currentUser.id);
+  loadCampeon();
 }
 
 function togglePass(inputId, btn) {
