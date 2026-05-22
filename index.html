@@ -233,7 +233,9 @@ async function doRegister() {
 }
 async function ensureProfile(user, name, nick) {
   const displayName = name || user.user_metadata?.name || user.email.split('@')[0];
-  const nickname = nick || user.user_metadata?.nickname || displayName;
+  // Check if profile already exists to avoid overwriting nickname
+  const { data: existing } = await sb.from('profiles').select('nickname').eq('id', user.id).single();
+  const nickname = nick || existing?.nickname || user.user_metadata?.nickname || displayName;
   await sb.from('profiles').upsert({ id: user.id, name: displayName, nickname, email: user.email }, { onConflict: 'id' });
 }
 async function logout() { await sb.auth.signOut(); location.reload(); }
