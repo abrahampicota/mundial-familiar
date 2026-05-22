@@ -433,7 +433,9 @@ function renderMatches() {
 
     // Round collapsed state
     const wasRoundCollapsed = collapsed[roundId];
-    const roundOpen = wasRoundCollapsed !== undefined ? !wasRoundCollapsed : true;
+    // Default: Grupos open, knockout rounds collapsed until their date
+    const defaultOpen = round === 'Grupos' || isRoundActive(round);
+    const roundOpen = wasRoundCollapsed !== undefined ? !wasRoundCollapsed : defaultOpen;
 
     const roundDaysHtml = Object.keys(days).sort().map(day => {
       const matches = days[day];
