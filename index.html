@@ -87,6 +87,13 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .btn-main { width: 100%; padding: 11px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; display: block; margin-bottom: 8px; }
 .btn-sec { width: 100%; padding: 11px; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; display: block; }
 .login-err { color: #fc8181; font-size: 13px; margin-top: 8px; min-height: 20px; }
+.countdown-wrap { background: #0d1a0d; border: 1px solid #2a382a; border-radius: 12px; padding: 14px 10px; margin-bottom: 1.5rem; }
+.countdown-title { font-size: 11px; color: #7a9a7a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+.countdown-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.countdown-box { background: #111811; border: 1px solid #2a382a; border-radius: 8px; padding: 8px 4px; text-align: center; }
+.countdown-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: #F5C518; line-height: 1; }
+.countdown-label { font-size: 9px; color: #7a9a7a; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+.countdown-started { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: #68d391; letter-spacing: 1px; padding: 10px; }
 
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 320px; text-align: center; }
 .toast.show { opacity: 1; }
@@ -118,7 +125,18 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">⚽ Mundial</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1.5rem;">FAMILIAR · PICOTAS 2026</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1rem;">FAMILIAR · PICOTAS 2026</div>
+    <div class="countdown-wrap">
+      <div class="countdown-title">⏳ Faltan para el inicio</div>
+      <div id="countdown-display">
+        <div class="countdown-grid">
+          <div class="countdown-box"><div class="countdown-num" id="cd-days">--</div><div class="countdown-label">Días</div></div>
+          <div class="countdown-box"><div class="countdown-num" id="cd-hours">--</div><div class="countdown-label">Horas</div></div>
+          <div class="countdown-box"><div class="countdown-num" id="cd-mins">--</div><div class="countdown-label">Minutos</div></div>
+          <div class="countdown-box"><div class="countdown-num" id="cd-secs">--</div><div class="countdown-label">Segundos</div></div>
+        </div>
+      </div>
+    </div>
     <div id="view-login">
       <input class="input" id="l-email" type="email" placeholder="Correo electrónico" onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()" />
       <div style="position:relative;">
@@ -209,6 +227,35 @@ function getOutcome(g1, g2) {
 }
 
 // ── AUTH ──────────────────────────────────────────────
+// ── COUNTDOWN ─────────────────────────────────────────
+const WC_START = new Date('2026-06-11T18:00:00Z'); // 1pm Panama time
+
+function updateCountdown() {
+  const now = new Date();
+  const diff = WC_START - now;
+  const display = document.getElementById('countdown-display');
+  if (!display) return;
+
+  if (diff <= 0) {
+    display.innerHTML = '<div class="countdown-started">⚽ ¡El Mundial ya comenzó!</div>';
+    return;
+  }
+
+  const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins  = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs  = Math.floor((diff % (1000 * 60)) / 1000);
+
+  const cd = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = String(val).padStart(2,'0'); };
+  cd('cd-days',  days);
+  cd('cd-hours', hours);
+  cd('cd-mins',  mins);
+  cd('cd-secs',  secs);
+}
+
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
 function showRegister() {
   document.getElementById('view-login').style.display = 'none';
   document.getElementById('view-register').style.display = 'block';
