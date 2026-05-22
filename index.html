@@ -120,9 +120,9 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <div class="login-logo">⚽ Mundial</div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1.5rem;">FAMILIAR · PICOTAS 2026</div>
     <div id="view-login">
-      <input class="input" id="l-email" type="email" placeholder="Correo electrónico" />
+      <input class="input" id="l-email" type="email" placeholder="Correo electrónico" onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()" />
       <div style="position:relative;">
-        <input class="input" id="l-pass" type="password" placeholder="Contraseña" style="padding-right:44px;margin-bottom:10px;" />
+        <input class="input" id="l-pass" type="password" placeholder="Contraseña" style="padding-right:44px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')doLogin()" />
         <button type="button" onclick="togglePass('l-pass',this)" style="position:absolute;right:12px;top:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#7a9a7a;padding:0;">👁</button>
       </div>
       <button class="btn-main" id="btn-login" onclick="doLogin()">Entrar</button>
@@ -134,7 +134,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       <input class="input" id="r-nick" type="text" placeholder="Nickname (ej: Tito, Abuela, Papi)" />
       <input class="input" id="r-email" type="email" placeholder="Correo electrónico" />
       <div style="position:relative;">
-        <input class="input" id="r-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)" style="padding-right:44px;margin-bottom:10px;" />
+        <input class="input" id="r-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)" style="padding-right:44px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')doRegister()" />
         <button type="button" onclick="togglePass('r-pass',this)" style="position:absolute;right:12px;top:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#7a9a7a;padding:0;">👁</button>
       </div>
       <button class="btn-main" id="btn-register" onclick="doRegister()">Crear cuenta</button>
