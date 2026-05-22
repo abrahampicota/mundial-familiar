@@ -523,12 +523,18 @@ function toggleDay(btn) {
 // Round activation dates (UTC) - opens when previous round starts
 const ROUND_DATES = {
   'Grupos':        { start: new Date('2024-01-01T00:00:00Z'), deadline: new Date('2026-06-11T18:00:00Z') },
-  'Dieciseisavos': { start: new Date('2026-07-02T00:00:00Z'), deadline: new Date('2026-07-02T17:00:00Z') },
-  'Octavos':       { start: new Date('2026-07-11T00:00:00Z'), deadline: new Date('2026-07-11T17:00:00Z') },
-  'Cuartos':       { start: new Date('2026-07-17T00:00:00Z'), deadline: new Date('2026-07-17T17:00:00Z') },
-  'Semifinal':     { start: new Date('2026-07-21T00:00:00Z'), deadline: new Date('2026-07-21T17:00:00Z') },
-  'Tercer Puesto': { start: new Date('2026-07-25T00:00:00Z'), deadline: new Date('2026-07-25T17:00:00Z') },
-  'Final':         { start: new Date('2026-07-26T00:00:00Z'), deadline: new Date('2026-07-26T17:00:00Z') },
+  // Dieciseisavos: 28 jun - 3 jul. Abre cuando termina fase de grupos (27 jun noche)
+  'Dieciseisavos': { start: new Date('2026-06-28T00:00:00Z'), deadline: new Date('2026-06-28T17:00:00Z') },
+  // Octavos: 4-7 jul. Abre cuando terminan dieciseisavos (3 jul noche)
+  'Octavos':       { start: new Date('2026-07-04T00:00:00Z'), deadline: new Date('2026-07-04T17:00:00Z') },
+  // Cuartos: 9-11 jul. Abre cuando terminan octavos (7 jul noche)
+  'Cuartos':       { start: new Date('2026-07-09T00:00:00Z'), deadline: new Date('2026-07-09T17:00:00Z') },
+  // Semifinales: 14-15 jul. Abre cuando terminan cuartos (11 jul noche)
+  'Semifinal':     { start: new Date('2026-07-14T00:00:00Z'), deadline: new Date('2026-07-14T17:00:00Z') },
+  // Tercer puesto: 18 jul. Abre cuando terminan semis (15 jul noche)
+  'Tercer Puesto': { start: new Date('2026-07-18T00:00:00Z'), deadline: new Date('2026-07-18T17:00:00Z') },
+  // Final: 19 jul. Abre el mismo día
+  'Final':         { start: new Date('2026-07-19T00:00:00Z'), deadline: new Date('2026-07-19T17:00:00Z') },
 };
 
 function isRoundActive(round) {
