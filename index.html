@@ -121,7 +121,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:1.5rem;">FAMILIAR 2026</div>
     <div id="view-login">
       <input class="input" id="l-email" type="email" placeholder="Correo electrónico" />
-      <input class="input" id="l-pass" type="password" placeholder="Contraseña" />
+      <div style="position:relative;">
+        <input class="input" id="l-pass" type="password" placeholder="Contraseña" style="padding-right:44px;margin-bottom:10px;" />
+        <button type="button" onclick="togglePass('l-pass',this)" style="position:absolute;right:12px;top:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#7a9a7a;padding:0;">👁</button>
+      </div>
       <button class="btn-main" id="btn-login" onclick="doLogin()">Entrar</button>
       <button class="btn-sec" onclick="showRegister()">¿No tienes cuenta? Regístrate</button>
       <div class="login-err" id="login-err"></div>
@@ -130,7 +133,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       <input class="input" id="r-name" type="text" placeholder="Tu nombre completo" />
       <input class="input" id="r-nick" type="text" placeholder="Nickname (ej: Tito, Abuela, Papi)" />
       <input class="input" id="r-email" type="email" placeholder="Correo electrónico" />
-      <input class="input" id="r-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)" />
+      <div style="position:relative;">
+        <input class="input" id="r-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)" style="padding-right:44px;margin-bottom:10px;" />
+        <button type="button" onclick="togglePass('r-pass',this)" style="position:absolute;right:12px;top:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#7a9a7a;padding:0;">👁</button>
+      </div>
       <button class="btn-main" id="btn-register" onclick="doRegister()">Crear cuenta</button>
       <button class="btn-sec" onclick="showLogin()">¿Ya tienes cuenta? Inicia sesión</button>
       <div class="login-err" id="register-err"></div>
@@ -334,9 +340,20 @@ async function loadMatches() {
   renderMatches();
 }
 
+function getCollapsedState() {
+  const state = {};
+  document.querySelectorAll('[id^="day-"]').forEach(el => {
+    state[el.id] = el.style.display === 'none';
+  });
+  return state;
+}
+
 function renderMatches() {
   const container = document.getElementById('matches-container');
   if (!allMatches.length) { container.innerHTML = '<div class="empty">No hay partidos cargados.</div>'; return; }
+
+  // Save current collapsed state before re-rendering
+  const collapsed = getCollapsedState();
 
   // Group matches by day (Panama time UTC-5)
   const groups = {};
@@ -373,6 +390,10 @@ function renderMatches() {
 
     const predBadge = myPreds > 0 ? '<span style="font-size:10px;color:#F5C518">'+myPreds+'/'+matches.length+' ✓</span>' : '<span style="font-size:10px;color:#7a9a7a">0/'+matches.length+' pronósticos</span>';
 
+    // Check if user had this day collapsed before
+    const wasCollapsed = collapsed['day-'+day];
+    const finalOpen = wasCollapsed !== undefined ? !wasCollapsed : isOpen;
+
     return '<div class="day-group">'
       + '<div class="day-header" data-target="day-'+day+'" onclick="toggleDay(this)">'
         + '<div style="display:flex;align-items:center;gap:8px;">'
@@ -381,14 +402,22 @@ function renderMatches() {
         + '</div>'
         + '<div class="day-meta">'
           + predBadge
-          + '<span class="day-arrow '+(isOpen?'open':'')+'" id="arrow-'+day+'">▼</span>'
+          + '<span class="day-arrow '+(finalOpen?'open':'')+'" id="arrow-'+day+'">▼</span>'
         + '</div>'
       + '</div>'
-      + '<div id="day-'+day+'" style="display:'+(isOpen?'block':'none')+';">'
+      + '<div id="day-'+day+'" style="display:'+(finalOpen?'block':'none')+';">'
         + matches.map(m => matchCard(m)).join('')
       + '</div>'
     + '</div>';
   }).join('');
+}
+
+function togglePass(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁';
 }
 
 function toggleDay(btn) {
