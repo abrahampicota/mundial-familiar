@@ -266,12 +266,14 @@ function showTab(name, btn) {
 
 // ── MATCHES ───────────────────────────────────────────
 async function syncResultsFromAPI() {
-  // Only sync if the World Cup has started
-  const wcStart = new Date('2026-06-11T00:00:00Z');
-  if (new Date() < wcStart) return;
+  // Only sync AFTER the World Cup first match starts (June 11, 2026 at 18:00 UTC)
+  const wcStart = new Date('2026-06-11T18:00:00Z');
+  if (new Date() < wcStart) {
+    console.log('Mundial not started yet, skipping API sync');
+    return;
+  }
 
   try {
-    // Get matches that are live or finished today
     const today = new Date().toISOString().split('T')[0];
     const res = await fetch(
       'https://v3.football.api-sports.io/fixtures?league=1&season=2026&date=' + today,
@@ -281,33 +283,31 @@ async function syncResultsFromAPI() {
     const json = await res.json();
     if (!json.response || !json.response.length) return;
 
-    const updates = json.response
-      .filter(f => ['FT','AET','PEN','1H','2H','HT','ET','BT','P'].includes(f.fixture.status.short))
-      .map(f => ({
-        id: f.fixture.id,
-        status: f.fixture.status.short,
-        goals1: f.goals.home,
-        goals2: f.goals.away,
-        updated_at: new Date().toISOString()
-      }));
-
+    const liveStatuses = ['FT','AET','PEN','1H','2H','HT','ET','BT','P'];
+    const updates = json.response.filter(f => liveStatuses.includes(f.fixture.status.short));
     if (!updates.length) return;
 
-    // Update each match in Supabase
-    for (const u of updates) {
+    // Match API results to our matches by team names (not by ID)
+    for (const f of updates) {
+      const apiTeam1 = f.teams.home.name;
+      const apiTeam2 = f.teams.away.name;
+      // Find our match by comparing team names loosely
+      const local = allMatches.find(m =>
+        m.team1.toLowerCase().includes(apiTeam1.toLowerCase().split(' ')[0]) ||
+        apiTeam1.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
+      );
+      if (!local) continue;
+      // Only update result fields, never overwrite teams or group
       await sb.from('matches').update({
-        status: u.status,
-        goals1: u.goals1,
-        goals2: u.goals2,
-        updated_at: u.updated_at
-      }).eq('id', u.id);
-
-      // Update local state too
-      const local = allMatches.find(m => m.id === u.id);
-      if (local) { local.status = u.status; local.goals1 = u.goals1; local.goals2 = u.goals2; }
+        status: f.fixture.status.short,
+        goals1: f.goals.home,
+        goals2: f.goals.away
+      }).eq('id', local.id);
+      local.status = f.fixture.status.short;
+      local.goals1 = f.goals.home;
+      local.goals2 = f.goals.away;
     }
-
-    console.log('Synced', updates.length, 'matches from API');
+    console.log('Synced results from API');
   } catch(e) {
     console.warn('API sync failed:', e);
   }
