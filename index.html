@@ -8,18 +8,38 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --gold: #F5C518; --green: #006644; --green-light: #00875A;
-  --bg: #0a0f0a; --surface: #111811; --surface2: #1a221a;
-  --border: #2a382a; --text: #e8f0e8; --text-muted: #7a9a7a;
+  /* Paleta oficial Mundial 2026 */
+  --red:     #E8231A;
+  --wine:    #8B1A2A;
+  --blue:    #2B4EAF;
+  --purple:  #A855C8;
+  --orange:  #F5621C;
+  --lime:    #7BC829;
+  --cyan:    #00C8C8;
+  --yellow:  #FFE600;
+
+  /* App theme */
+  --gold:         #FFE600;
+  --accent:       #E8231A;
+  --accent2:      #2B4EAF;
+  --bg:           #0a0008;
+  --surface:      #130010;
+  --surface2:     #1e0018;
+  --border:       #3a0030;
+  --border2:      #2B1A5A;
+  --text:         #f0eeff;
+  --text-muted:   #9988bb;
+  --green-light:  #7BC829;
+  --green:        #4a8000;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-header { background: var(--surface); border-bottom: 2px solid var(--gold); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
-.logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px; color: var(--gold); }
+header { background: var(--surface); border-bottom: 3px solid var(--accent); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
+.logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px; color: var(--yellow); }
 .logo span { color: var(--text); }
 nav { display: flex; gap: 4px; padding: 1rem 1.5rem 0; border-bottom: 1px solid var(--border); background: var(--surface); overflow-x: auto; }
 .nav-btn { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; padding: 8px 20px; border: none; background: none; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
-.nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+.nav-btn.active { color: var(--yellow); border-bottom-color: var(--accent); }
 main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .section { display: none; } .section.active { display: block; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -43,11 +63,11 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .score-input:disabled { opacity: 0.6; cursor: default; }
 .score-sep { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--text-muted); }
 .score-team-label { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 4px; }
-.btn-save-pred { width: 100%; padding: 9px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; margin-top: 4px; }
+.btn-save-pred { width: 100%; padding: 9px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; margin-top: 4px; }
 .btn-save-pred:disabled { opacity: 0.5; cursor: default; background: var(--surface2); color: var(--text-muted); }
 .pts-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
-.pts-exact { background: #1a3a2a; color: #68d391; border: 1px solid #00875A; }
-.pts-outcome { background: #2a2a0a; color: var(--gold); border: 1px solid #5a5000; }
+.pts-exact { background: #1a3000; color: var(--lime); border: 1px solid var(--lime); }
+.pts-outcome { background: #1a1040; color: var(--yellow); border: 1px solid var(--blue); }
 .pts-wrong { background: #2a0a0a; color: #fc8181; border: 1px solid #742a2a; }
 .pts-pending { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
 .family-preds { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -56,14 +76,14 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .lb-item { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
 .lb-item.me { border-color: var(--gold); }
 .lb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; width: 36px; text-align: center; color: var(--text-muted); }
-.lb-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--gold); flex-shrink: 0; }
+.lb-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--gold); flex-shrink: 0; }
 .lb-pts-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--gold); line-height: 1; }
 .lb-pts-label { font-size: 11px; color: var(--text-muted); }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
 .stat-card { background: var(--surface2); border-radius: 10px; padding: 12px; text-align: center; }
 .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--gold); line-height: 1; }
 .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.section-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 1px; color: var(--gold); margin-bottom: 1rem; }
+.section-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 1px; color: var(--yellow); margin-bottom: 1rem; }
 .empty { text-align: center; color: var(--text-muted); padding: 3rem 1rem; font-size: 14px; }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 .day-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; user-select:none; }
@@ -81,17 +101,17 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 #app { display: none; }
 #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 380px; text-align: center; }
-.login-logo { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--gold); letter-spacing: 3px; margin-bottom: 4px; }
+.login-logo { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--yellow); letter-spacing: 3px; margin-bottom: 4px; text-shadow: 0 0 30px rgba(232,35,26,0.5); }
 .input { width: 100%; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; margin-bottom: 10px; outline: none; display: block; }
 .input:focus { border-color: var(--gold); }
-.btn-main { width: 100%; padding: 11px; background: var(--gold); color: #0a0f0a; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; display: block; margin-bottom: 8px; }
+.btn-main { width: 100%; padding: 11px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; display: block; margin-bottom: 8px; }
 .btn-sec { width: 100%; padding: 11px; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; display: block; }
 .login-err { color: #fc8181; font-size: 13px; margin-top: 8px; min-height: 20px; }
-.countdown-wrap { background: #0d1a0d; border: 1px solid #2a382a; border-radius: 12px; padding: 14px 10px; margin-bottom: 1.5rem; }
+.countdown-wrap { background: #0d0020; border: 1px solid var(--purple); border-radius: 12px; padding: 14px 10px; margin-bottom: 1.5rem; }
 .countdown-title { font-size: 11px; color: #7a9a7a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
 .countdown-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .countdown-box { background: #111811; border: 1px solid #2a382a; border-radius: 8px; padding: 8px 4px; text-align: center; }
-.countdown-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: #F5C518; line-height: 1; }
+.countdown-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--yellow); line-height: 1; }
 .countdown-label { font-size: 9px; color: #7a9a7a; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 .countdown-started { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: #68d391; letter-spacing: 1px; padding: 10px; }
 
@@ -175,6 +195,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <button class="nav-btn" onclick="showTab('tabla',this)">Tabla</button>
     <button class="nav-btn" onclick="showTab('perfil',this)">Mi perfil</button>
     <button class="nav-btn" onclick="showTab('campeon',this)">🏆 Campeón</button>
+    <button class="nav-btn" onclick="showTab('stats',this)">📊 Estadísticas</button>
     <button class="nav-btn" id="nav-admin" style="display:none" onclick="showTab('admin',this)">Admin</button>
   </nav>
   <main>
@@ -197,6 +218,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     <div id="tab-perfil" class="section">
       <div class="section-title">Mi perfil</div>
       <div id="profile-container"></div>
+    </div>
+    <div id="tab-stats" class="section">
+      <div class="section-title">📊 Estadísticas</div>
+      <div id="stats-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
     <div id="tab-campeon" class="section">
       <div class="section-title">🏆 Predicción del Campeón</div>
@@ -333,6 +358,7 @@ function showTab(name, btn) {
   if (name === 'tabla') loadLeaderboard();
   if (name === 'perfil') renderProfile();
   if (name === 'admin') loadAdmin();
+  if (name === 'stats') loadStats();
   if (name === 'campeon') loadCampeon();
 }
 
@@ -639,6 +665,145 @@ async function deletePick() {
   if (!ok) return;
   await sb.from('champion_picks').delete().eq('user_id', currentUser.id);
   loadCampeon();
+}
+
+// ── STATISTICS ────────────────────────────────────────
+async function loadStats() {
+  const container = document.getElementById('stats-container');
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Calculando...</div>';
+
+  const { data: profiles } = await sb.from('profiles').select('*');
+  const { data: preds } = await sb.from('predictions').select('*, matches(status,goals1,goals2,date,round,group_name)');
+  if (!profiles || !preds) { container.innerHTML = '<div class="empty">Sin datos aún.</div>'; return; }
+
+  // Calculate stats per player
+  const playerStats = profiles.map(p => {
+    const myPreds = preds.filter(x => x.user_id === p.id);
+    let pts = 0, exact = 0, outcome = 0, played = 0, streak = 0, maxStreak = 0, curStreak = 0;
+    const donePreds = myPreds.filter(x => x.matches && ['FT','AET','PEN'].includes(x.matches.status))
+      .sort((a,b) => new Date(a.matches.date) - new Date(b.matches.date));
+
+    donePreds.forEach(x => {
+      played++;
+      const p2 = calcPts(x.pred_goals1, x.pred_goals2, x.matches.goals1, x.matches.goals2);
+      pts += p2 || 0;
+      if (p2 === 5) { exact++; curStreak++; }
+      else if (p2 === 3) { outcome++; curStreak++; }
+      else { curStreak = 0; }
+      maxStreak = Math.max(maxStreak, curStreak);
+    });
+
+    return { ...p, pts, exact, outcome, played, maxStreak, pct: played ? Math.round((exact+outcome)/played*100) : 0, donePreds };
+  }).sort((a,b) => b.pts - a.pts);
+
+  // Chart colors from World Cup palette
+  const chartColors = ['#E8231A','#2B4EAF','#FFE600','#7BC829','#A855C8','#F5621C','#00C8C8','#8B1A2A'];
+
+  // Build cumulative points over time per player
+  const allDates = [...new Set(preds
+    .filter(x => x.matches && ['FT','AET','PEN'].includes(x.matches.status))
+    .map(x => x.matches.date.split('T')[0])
+  )].sort();
+
+  // Generate SVG chart
+  const chartW = 600, chartH = 200, padL = 40, padB = 30, padT = 10, padR = 20;
+  const innerW = chartW - padL - padR;
+  const innerH = chartH - padB - padT;
+
+  // Cumulative points per player per date
+  const lines = playerStats.map((p, i) => {
+    let cum = 0;
+    const points = [{date: null, pts: 0}];
+    allDates.forEach(d => {
+      p.donePreds.filter(x => x.matches.date.split('T')[0] === d).forEach(x => {
+        cum += calcPts(x.pred_goals1, x.pred_goals2, x.matches.goals1, x.matches.goals2) || 0;
+      });
+      points.push({date: d, pts: cum});
+    });
+    return { name: p.nickname||p.name, color: chartColors[i % chartColors.length], points, isMe: p.id === currentUser.id };
+  });
+
+  const maxPts = Math.max(...lines.map(l => Math.max(...l.points.map(p => p.pts))), 1);
+  const totalDates = allDates.length + 1;
+
+  const toX = idx => padL + (idx / Math.max(totalDates - 1, 1)) * innerW;
+  const toY = pts => padT + innerH - (pts / maxPts) * innerH;
+
+  const svgLines = lines.map(l => {
+    const pts = l.points;
+    const pathD = pts.map((p,i) => (i===0?'M':'L') + toX(i) + ',' + toY(p.pts)).join(' ');
+    return '<path d="'+pathD+'" fill="none" stroke="'+l.color+'" stroke-width="'+(l.isMe?3:2)+'" stroke-linecap="round" stroke-linejoin="round" '+(l.isMe?'':'opacity="0.7"')+'"/>'
+      + pts.map((p,i) => i === pts.length-1 && p.pts > 0
+        ? '<circle cx="'+toX(i)+'" cy="'+toY(p.pts)+'" r="4" fill="'+l.color+'"/>'
+        : '').join('');
+  }).join('');
+
+  // Y axis labels
+  const yLabels = [0, Math.round(maxPts/2), maxPts].map(v =>
+    '<text x="'+(padL-5)+'" y="'+(toY(v)+4)+'" text-anchor="end" font-size="10" fill="#9988bb">'+v+'</text>'
+  ).join('');
+
+  // Grid lines
+  const gridLines = [0, Math.round(maxPts/2), maxPts].map(v =>
+    '<line x1="'+padL+'" y1="'+toY(v)+'" x2="'+(chartW-padR)+'" y2="'+toY(v)+'" stroke="#3a0030" stroke-width="1"/>'
+  ).join('');
+
+  const svgChart = allDates.length === 0
+    ? '<div class="empty" style="padding:2rem">Los puntos aparecerán cuando empiece el Mundial 🏆</div>'
+    : '<div style="overflow-x:auto;margin-bottom:12px;">'
+      + '<svg viewBox="0 0 '+chartW+' '+chartH+'" style="width:100%;min-width:300px;max-width:600px;">'
+      + '<rect width="'+chartW+'" height="'+chartH+'" fill="transparent"/>'
+      + gridLines + yLabels + svgLines
+      + '</svg></div>'
+      // Legend
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:4px;">'
+      + lines.map(l => '<div style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+          +'<div style="width:12px;height:12px;border-radius:50%;background:'+l.color+'"></div>'
+          +'<span style="color:#f0eeff;">'+(l.isMe?'<b>'+l.name+'</b>':l.name)+'</span>'
+        +'</div>').join('')
+      + '</div>';
+
+  // Render
+  container.innerHTML =
+    // Chart card
+    '<div class="card" style="margin-bottom:1rem;">'
+      + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#9988bb;letter-spacing:1px;margin-bottom:10px;">EVOLUCIÓN DE PUNTOS</div>'
+      + svgChart
+    + '</div>'
+
+    // Player cards
+    + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#9988bb;letter-spacing:1px;margin-bottom:10px;">DETALLE POR JUGADOR</div>'
+    + playerStats.map((p, i) => {
+      const color = chartColors[i % chartColors.length];
+      const isMe = p.id === currentUser.id;
+      return '<div class="card" style="margin-bottom:8px;border-left:3px solid '+color+';">'
+        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+          + '<div style="width:36px;height:36px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;">'+(p.nickname||p.name)[0].toUpperCase()+'</div>'
+          + '<div style="flex:1">'
+            + '<div style="font-weight:600;font-size:15px;">'+(p.nickname||p.name)+(isMe?' <span style="font-size:11px;color:#9988bb">(tú)</span>':'')+'</div>'
+            + '<div style="font-size:12px;color:#9988bb;">'+(i+1)+'° lugar · '+p.played+' partidos jugados</div>'
+          + '</div>'
+          + '<div style="text-align:right;">'
+            + '<div style="font-family:Bebas Neue,sans-serif;font-size:1.8rem;color:'+color+';line-height:1">'+p.pts+'</div>'
+            + '<div style="font-size:11px;color:#9988bb;">puntos</div>'
+          + '</div>'
+        + '</div>'
+        // Mini stats
+        + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">'
+          + [
+              ['⭐', p.exact, 'Exactos'],
+              ['✓', p.outcome, 'Ganador'],
+              ['%', p.pct+'%', 'Precisión'],
+              ['🔥', p.maxStreak, 'Racha'],
+            ].map(([icon, val, label]) =>
+              '<div style="background:#1e0018;border-radius:8px;padding:8px;text-align:center;">'
+                +'<div style="font-size:1.1rem;font-family:Bebas Neue,sans-serif;color:'+color+'">'+val+'</div>'
+                +'<div style="font-size:10px;color:#9988bb;">'+icon+' '+label+'</div>'
+              +'</div>'
+            ).join('')
+        + '</div>'
+      + '</div>';
+    }).join('');
 }
 
 function togglePass(inputId, btn) {
