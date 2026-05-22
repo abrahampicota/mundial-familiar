@@ -66,6 +66,14 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 1px; color: var(--gold); margin-bottom: 1rem; }
 .empty { text-align: center; color: var(--text-muted); padding: 3rem 1rem; font-size: 14px; }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+.day-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; user-select:none; }
+.day-header:hover { border-color:#F5C518; }
+.day-title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:1px; color:#e8f0e8; }
+.day-meta { display:flex; align-items:center; gap:8px; }
+.day-count { font-size:11px; color:#7a9a7a; }
+.day-arrow { font-size:12px; color:#7a9a7a; transition:transform 0.2s; }
+.day-arrow.open { transform:rotate(180deg); }
+.day-group { margin-bottom:6px; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .btn-logout { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
@@ -329,7 +337,69 @@ async function loadMatches() {
 function renderMatches() {
   const container = document.getElementById('matches-container');
   if (!allMatches.length) { container.innerHTML = '<div class="empty">No hay partidos cargados.</div>'; return; }
-  container.innerHTML = allMatches.map(m => matchCard(m)).join('');
+
+  // Group matches by day (Panama time UTC-5)
+  const groups = {};
+  allMatches.forEach(m => {
+    const d = new Date(m.date);
+    // Convert to Panama time (UTC-5)
+    const panamaDate = new Date(d.getTime() - 5 * 60 * 60 * 1000);
+    const key = panamaDate.toISOString().split('T')[0];
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(m);
+  });
+
+  const today = new Date();
+  const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  container.innerHTML = Object.keys(groups).sort().map(day => {
+    const matches = groups[day];
+    const date = new Date(day + 'T12:00:00');
+    const dayStr = date.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+    const dayStrCap = dayStr.charAt(0).toUpperCase() + dayStr.slice(1);
+    const isToday = day === todayPanama;
+    const hasLive = matches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
+    const hasDone = matches.every(m => ['FT','AET','PEN'].includes(m.status));
+    const myPreds = matches.filter(m => allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id)).length;
+
+    // Auto-expand today and days with live matches; collapse past days
+    const isPast = day < todayPanama && !hasLive;
+    const isOpen = !isPast || isToday || hasLive;
+
+    let badge = '';
+    if (hasLive) badge = '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;font-size:10px;">⚽ EN VIVO</span>';
+    else if (isToday) badge = '<span class="badge badge-soon" style="font-size:10px;">HOY</span>';
+    else if (hasDone) badge = '<span class="badge badge-done" style="font-size:10px;">Finalizado</span>';
+
+    const predBadge = myPreds > 0 ? '<span style="font-size:10px;color:#F5C518">'+myPreds+'/'+matches.length+' ✓</span>' : '<span style="font-size:10px;color:#7a9a7a">0/'+matches.length+' pronósticos</span>';
+
+    return '<div class="day-group">'
+      + '<div class="day-header" data-target="day-'+day+'" onclick="toggleDay(this)">'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<div class="day-title">'+dayStrCap+'</div>'
+          + badge
+        + '</div>'
+        + '<div class="day-meta">'
+          + predBadge
+          + '<span class="day-arrow '+(isOpen?'open':'')+'" id="arrow-'+day+'">▼</span>'
+        + '</div>'
+      + '</div>'
+      + '<div id="day-'+day+'" style="display:'+(isOpen?'block':'none')+';">'
+        + matches.map(m => matchCard(m)).join('')
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+function toggleDay(btn) {
+  const id = btn.dataset.target;
+  const day = id.replace('day-', '');
+  const el = document.getElementById(id);
+  const arrow = document.getElementById('arrow-' + day);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.classList.toggle('open', !isOpen);
 }
 
 function matchCard(m) {
