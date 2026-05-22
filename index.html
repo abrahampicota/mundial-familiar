@@ -204,7 +204,12 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     </div>
     <div id="tab-admin" class="section">
       <div class="section-title">Admin</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;">
+        <button onclick="adminShowTab('usuarios')" id="admin-tab-usuarios" style="padding:7px 16px;border-radius:8px;border:1px solid #F5C518;background:#2a2000;color:#F5C518;font-size:13px;font-weight:600;cursor:pointer;">👥 Usuarios</button>
+        <button onclick="adminShowTab('partidos')" id="admin-tab-partidos" style="padding:7px 16px;border-radius:8px;border:1px solid #2a382a;background:none;color:#7a9a7a;font-size:13px;cursor:pointer;">⚽ Partidos</button>
+      </div>
       <div id="admin-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
+      <div id="admin-matches-container" style="display:none"></div>
     </div>
   </main>
 </div>
@@ -951,6 +956,113 @@ async function renderProfile() {
 // ── INIT ──────────────────────────────────────────────
 function nickOf(p) {
   return p.nickname || p.name || '?';
+}
+
+function adminShowTab(tab) {
+  const tabs = ['usuarios', 'partidos'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('admin-tab-' + t);
+    if (btn) {
+      btn.style.border = t === tab ? '1px solid #F5C518' : '1px solid #2a382a';
+      btn.style.background = t === tab ? '#2a2000' : 'none';
+      btn.style.color = t === tab ? '#F5C518' : '#7a9a7a';
+    }
+  });
+  document.getElementById('admin-container').style.display = tab === 'usuarios' ? 'block' : 'none';
+  document.getElementById('admin-matches-container').style.display = tab === 'partidos' ? 'block' : 'none';
+  if (tab === 'partidos') loadAdminMatches();
+  if (tab === 'usuarios') loadAdmin();
+}
+
+async function loadAdminMatches() {
+  const container = document.getElementById('admin-matches-container');
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando partidos...</div>';
+
+  const { data: matches } = await sb.from('matches').select('*').order('date', { ascending: true });
+  if (!matches) { container.innerHTML = '<div class="empty">Error cargando.</div>'; return; }
+
+  const roundOrder = ['Grupos','Dieciseisavos','Octavos','Cuartos','Semifinal','Tercer Puesto','Final'];
+  const byRound = {};
+  matches.forEach(m => {
+    const r = m.round || 'Grupos';
+    if (!byRound[r]) byRound[r] = [];
+    byRound[r].push(m);
+  });
+
+  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+    const roundMatches = byRound[round];
+    return '<div style="margin-bottom:1rem;">'
+      + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#7a9a7a;letter-spacing:1px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid #2a382a;">' + round + '</div>'
+      + roundMatches.map(m => {
+          const done = ['FT','AET','PEN'].includes(m.status);
+          const dateStr = m.date ? new Date(m.date).toLocaleString('es', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+          return '<div class="card" style="padding:10px 14px;margin-bottom:6px;" id="amatch-'+m.id+'">'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+              + '<div style="flex:1;min-width:0;">'
+                + '<div style="font-size:12px;color:#7a9a7a;margin-bottom:3px;">' + dateStr + ' · ' + (m.group_name||'') + '</div>'
+                + '<div style="font-weight:500;font-size:14px;color:#e8f0e8;">' + m.team1 + ' vs ' + m.team2 + '</div>'
+              + '</div>'
+              + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
+                + (done ? '<span class="badge badge-done" style="font-size:10px;">'+m.goals1+' - '+m.goals2+'</span>' : '<span class="badge badge-soon" style="font-size:10px;">NS</span>')
+                + '<button onclick="openEditMatch('+m.id+')" style="padding:5px 10px;border:1px solid #2a382a;border-radius:6px;background:none;color:#7a9a7a;font-size:12px;cursor:pointer;">✏️ Editar</button>'
+              + '</div>'
+            + '</div>'
+            + '<div id="edit-'+m.id+'" style="display:none;margin-top:10px;border-top:1px solid #2a382a;padding-top:10px;">'
+              + '<div style="display:grid;grid-template-columns:1fr auto auto auto 1fr;align-items:center;gap:8px;margin-bottom:8px;">'
+                + '<div style="text-align:right;">'
+                  + '<div style="font-size:11px;color:#7a9a7a;margin-bottom:4px;">' + m.team1 + '</div>'
+                  + '<input id="eg1-'+m.id+'" type="number" min="0" max="20" value="'+(m.goals1??'')+'" placeholder="0" style="width:52px;height:44px;text-align:center;font-family:Bebas Neue,sans-serif;font-size:1.3rem;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#F5C518;outline:none;" />'
+                + '</div>'
+                + '<div style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:#7a9a7a;padding-top:18px;">-</div>'
+                + '<div style="text-align:left;">'
+                  + '<div style="font-size:11px;color:#7a9a7a;margin-bottom:4px;">' + m.team2 + '</div>'
+                  + '<input id="eg2-'+m.id+'" type="number" min="0" max="20" value="'+(m.goals2??'')+'" placeholder="0" style="width:52px;height:44px;text-align:center;font-family:Bebas Neue,sans-serif;font-size:1.3rem;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#F5C518;outline:none;" />'
+                + '</div>'
+              + '</div>'
+              + '<div style="display:flex;gap:6px;">'
+                + '<select id="estat-'+m.id+'" style="flex:1;padding:7px;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#e8f0e8;font-size:13px;">'
+                  + ['NS','1H','HT','2H','FT','AET','PEN'].map(s => '<option value="'+s+'"'+(m.status===s?' selected':'')+'>'+s+'</option>').join('')
+                + '</select>'
+                + '<button onclick="saveMatchEdit('+m.id+')" style="padding:7px 16px;background:#F5C518;color:#0a0f0a;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Guardar</button>'
+                + '<button onclick="closeEditMatch('+m.id+')" style="padding:7px 12px;border:1px solid #2a382a;border-radius:8px;background:none;color:#7a9a7a;font-size:13px;cursor:pointer;">✕</button>'
+              + '</div>'
+            + '</div>'
+          + '</div>';
+        }).join('')
+    + '</div>';
+  }).join('');
+}
+
+function openEditMatch(id) {
+  // Close all other open edits
+  document.querySelectorAll('[id^="edit-"]').forEach(el => el.style.display = 'none');
+  const el = document.getElementById('edit-' + id);
+  if (el) el.style.display = 'block';
+}
+
+function closeEditMatch(id) {
+  const el = document.getElementById('edit-' + id);
+  if (el) el.style.display = 'none';
+}
+
+async function saveMatchEdit(matchId) {
+  const g1Input = document.getElementById('eg1-' + matchId);
+  const g2Input = document.getElementById('eg2-' + matchId);
+  const statInput = document.getElementById('estat-' + matchId);
+  const g1 = g1Input.value === '' ? null : parseInt(g1Input.value);
+  const g2 = g2Input.value === '' ? null : parseInt(g2Input.value);
+  const status = statInput.value;
+
+  const { error } = await sb.from('matches').update({ goals1: g1, goals2: g2, status }).eq('id', matchId);
+  if (error) { showToast('Error guardando', 'error'); return; }
+
+  // Update local state
+  const local = allMatches.find(m => m.id === matchId);
+  if (local) { local.goals1 = g1; local.goals2 = g2; local.status = status; }
+
+  showToast('Partido actualizado ✓', 'ok');
+  closeEditMatch(matchId);
+  loadAdminMatches();
 }
 
 async function loadAdmin() {
