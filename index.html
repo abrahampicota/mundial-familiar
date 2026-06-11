@@ -1342,13 +1342,13 @@ function confirmDialog(title, msg) {
 }
 
 function toggleRanking(btn) {
-  const id = btn.dataset.id;
+  const id = btn.dataset.target || btn.dataset.id;
   const el = document.getElementById(id);
-  const icon = btn.querySelector('span:last-child');
+  const icon = document.getElementById(id + '-icon');
   if (!el) return;
   const isOpen = el.style.display !== 'none';
   el.style.display = isOpen ? 'none' : 'block';
-  if (icon) icon.textContent = isOpen ? '▼ Ver' : '▲ Ocultar';
+  if (icon) icon.textContent = isOpen ? '▲ Ocultar' : '▼ Ver';
 }
 
 sb.auth.getSession().then(({ data: { session } }) => {
