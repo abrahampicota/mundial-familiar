@@ -651,10 +651,22 @@ async function loadCampeon() {
   const deadline = new Date('2026-07-19T22:00:00Z'); // Final: 19 jul 5pm Panama
   const canPick = new Date() < deadline;
 
-  // Get teams from group stage
-  const teams = [...new Set(
-    allMatches.filter(m => m.round === 'Grupos').flatMap(m => [m.team1, m.team2])
-  )].filter(t => t && !t.startsWith('Por') && !t.startsWith('Ganador')).sort();
+  // Fixed list of all 48 World Cup 2026 teams
+  const teams = [
+    'Alemania', 'Arabia Saudita', 'Argentina', 'Australia',
+    'Austria', 'Bélgica', 'Bolivia', 'Bosnia y Herzegovina',
+    'Brasil', 'Canadá', 'Chequia', 'Colombia',
+    'Corea del Sur', 'Costa de Marfil', 'Croacia', 'Curazao',
+    'Ecuador', 'Egipto', 'Escocia', 'España',
+    'Estados Unidos', 'Francia', 'Ghana', 'Haití',
+    'Honduras', 'Indonesia', 'Inglaterra', 'Irak',
+    'Irán', 'Japón', 'Jordania', 'Marruecos',
+    'México', 'Nigeria', 'Noruega', 'Nueva Zelanda',
+    'Países Bajos', 'Panamá', 'Paraguay', 'Portugal',
+    'Qatar', 'RD del Congo', 'Rep. Checa', 'Senegal',
+    'Sudáfrica', 'Suecia', 'Suiza', 'Túnez',
+    'Turquía', 'Uruguay', 'Uzbekistán'
+  ].sort((a, b) => a.localeCompare(b, 'es'));
 
   // My pick section
   let myPickHtml = '';
