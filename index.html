@@ -485,9 +485,16 @@ async function loadMatches() {
   const ids = allMatches.map(m => m.id);
   const { data: preds } = await sb.from('predictions').select('*, profiles(name,nickname)').in('match_id', ids);
   allPredictions = preds || [];
-  // Sync results from API in background (won't block rendering)
-  syncResultsFromAPI().then(() => renderMatches());
   renderMatches();
+  // Try auto-sync in background with 5s timeout - won't block rendering
+  syncWithTimeout(5000).then(result => {
+    if (result.synced > 0) renderMatches();
+  }).catch(() => {}); // silent fail
+}
+
+async function syncWithTimeout(ms) {
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+  return Promise.race([syncResultsFromAPI(), timeout]);
 }
 
 function getCollapsedState() {
@@ -1454,13 +1461,14 @@ sb.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) initApp(session.user);
 });
 
-// Auto-refresh every 2 minutes if there are live matches
+// Auto-refresh each 2 min if there are live matches, with timeout protection
 setInterval(async () => {
   if (!currentUser) return;
   const hasLive = allMatches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
   if (hasLive) {
-    await syncResultsFromAPI();
-    renderMatches();
+    syncWithTimeout(5000).then(result => {
+      if (result?.synced > 0) renderMatches();
+    }).catch(() => {});
   }
 }, 2 * 60 * 1000);
 </script>
