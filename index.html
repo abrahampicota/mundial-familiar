@@ -1384,6 +1384,11 @@ async function loadAdminMatches() {
       + '<button id="sync-api-btn" onclick="manualSync()" style="padding:8px 16px;background:#E8231A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;">🔄 Sincronizar con API</button>'
     + '</div>'
     + '<div id="sync-msg" style="font-size:13px;min-height:18px;"></div>'
+    + '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">'
+    + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:8px;">📅 SINCRONIZAR DESDE GITHUB</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Actualiza fechas y resultados desde openfootball/worldcup.json. Sin límites.</div>'
+    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync desde GitHub</button>'
+    + '<div id="github-sync-msg" style="font-size:13px;min-height:18px;margin-top:8px;"></div>'
   + '</div>'
   + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
 
