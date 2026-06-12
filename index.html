@@ -561,7 +561,7 @@ function renderMatches() {
   const today = new Date();
   const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const days = byRound[round];
     const roundId = 'round-' + round.replace(/ /g,'_');
     const allRoundMatches = Object.values(days).flat();
@@ -1282,7 +1282,7 @@ async function renderAdminMatchesList() {
     byRound[r].push(m);
   });
 
-  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const roundMatches = byRound[round];
     return '<div style="margin-bottom:1rem;">'
       + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#7a9a7a;letter-spacing:1px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid #2a382a;">' + round + '</div>'
