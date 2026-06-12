@@ -371,12 +371,61 @@ function showTab(name, btn) {
 async function syncResultsFromAPI(manualDate) {
   const wcStart = new Date('2026-06-11T18:00:00Z');
   if (new Date() < wcStart) {
-    console.log('Mundial not started yet, skipping API sync');
-    return { synced: 0 };
+    return { synced: 0, msg: 'El Mundial aún no ha comenzado' };
   }
 
+  // Try wc2026api.com first (free, specific to WC2026)
   try {
-    // If manual date provided use it, otherwise fetch today AND yesterday (to catch late finishes)
+    const url = manualDate
+      ? 'https://api.wc2026api.com/matches?status=FT,AET,PEN,1H,2H,HT,ET,P'
+      : 'https://api.wc2026api.com/matches?status=FT,AET,PEN,1H,2H,HT,ET,P';
+    
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      const matches = Array.isArray(json) ? json : (json.data || json.matches || []);
+      
+      if (matches.length > 0) {
+        let synced = 0;
+        for (const f of matches) {
+          // wc2026api fields: home_team, away_team, home_score, away_score, status, kickoff_utc
+          const apiTeam1 = f.home_team;
+          const apiTeam2 = f.away_team;
+          const apiDate = (f.kickoff_utc || f.date || '').split('T')[0];
+          const apiStatus = f.status === 'FT' ? 'FT' : f.status === 'LIVE' ? '2H' : f.status;
+          const goals1 = f.home_score ?? f.score_home ?? null;
+          const goals2 = f.away_score ?? f.score_away ?? null;
+          if (goals1 === null) continue;
+
+          // Match to our local matches by team name
+          let local = allMatches.find(m => {
+            const mDate = new Date(m.date).toISOString().split('T')[0];
+            const sameDateOrClose = !apiDate || Math.abs(new Date(mDate) - new Date(apiDate)) < 2*86400000;
+            return sameDateOrClose && (
+              m.team1.toLowerCase().includes(apiTeam1?.toLowerCase().split(' ')[0]) ||
+              apiTeam1?.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
+            );
+          });
+
+          if (!local) continue;
+          await sb.from('matches').update({ status: apiStatus || 'FT', goals1, goals2 }).eq('id', local.id);
+          local.status = apiStatus || 'FT';
+          local.goals1 = goals1;
+          local.goals2 = goals2;
+          synced++;
+        }
+        if (synced > 0) {
+          console.log('Synced', synced, 'from wc2026api.com');
+          return { synced };
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('wc2026api failed, trying API-Football:', e);
+  }
+
+  // Fallback: API-Football
+  try {
     const dates = manualDate ? [manualDate] : [
       new Date().toISOString().split('T')[0],
       new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -393,19 +442,20 @@ async function syncResultsFromAPI(manualDate) {
       if (json.response?.length) allFixtures = allFixtures.concat(json.response);
     }
 
-    if (!allFixtures.length) return { synced: 0, msg: 'Sin partidos en la API para esas fechas' };
+    if (!allFixtures.length) return { synced: 0, msg: 'Sin datos en las APIs. Verifica la fecha o usa Admin para editar manualmente.' };
 
     const liveStatuses = ['FT','AET','PEN','1H','2H','HT','ET','BT','P'];
     const updates = allFixtures.filter(f => liveStatuses.includes(f.fixture.status.short));
-    if (!updates.length) return { synced: 0, msg: 'Sin resultados disponibles aún' };
+    if (!updates.length) {
+      const statuses = [...new Set(allFixtures.map(f => f.fixture.status.short))];
+      return { synced: 0, msg: allFixtures.length + ' partidos en API-Football con estado: ' + statuses.join(', ') };
+    }
 
-    // Match API results to our matches
+    let synced = 0;
     for (const f of updates) {
       const apiTeam1 = f.teams.home.name;
       const apiTeam2 = f.teams.away.name;
       const apiDate = f.fixture.date.split('T')[0];
-
-      // Find match by date + teams or by placeholder pattern
       let local = allMatches.find(m => {
         const mDate = new Date(m.date).toISOString().split('T')[0];
         return mDate === apiDate && (
@@ -413,45 +463,17 @@ async function syncResultsFromAPI(manualDate) {
           apiTeam1.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
         );
       });
-
-      // For knockout rounds, match by date only if teams are still placeholders
-      if (!local) {
-        local = allMatches.find(m => {
-          const mDate = new Date(m.date).toISOString().split('T')[0];
-          return mDate === apiDate && (
-            m.team1.startsWith('Ganador') || m.team1.startsWith('1') || m.team1.startsWith('2') || m.team1.startsWith('3')
-          );
-        });
-      }
-
       if (!local) continue;
-
-      const updateData = {
-        status: f.fixture.status.short,
-        goals1: f.goals.home,
-        goals2: f.goals.away
-      };
-
-      // Update team names if they are still placeholders
-      const isPlaceholder = local.team1.startsWith('Ganador') || local.team1.startsWith('1') ||
-                            local.team1.startsWith('2') || local.team1.startsWith('3') ||
-                            local.team1.startsWith('Perdedor');
-      if (isPlaceholder) {
-        updateData.team1 = apiTeam1;
-        updateData.team2 = apiTeam2;
-      }
-
+      const updateData = { status: f.fixture.status.short, goals1: f.goals.home, goals2: f.goals.away };
       await sb.from('matches').update(updateData).eq('id', local.id);
       local.status = updateData.status;
       local.goals1 = updateData.goals1;
       local.goals2 = updateData.goals2;
-      if (isPlaceholder) { local.team1 = apiTeam1; local.team2 = apiTeam2; }
+      synced++;
     }
-    console.log('Synced', updates.length, 'results from API');
-    return { synced: updates.length };
+    return { synced };
   } catch(e) {
-    console.warn('API sync failed:', e);
-    return { synced: 0, msg: 'Error de conexión con la API' };
+    return { synced: 0, msg: 'Error de conexión. Usa Admin → Partidos para editar manualmente.' };
   }
 }
 
@@ -1202,6 +1224,9 @@ async function manualSync() {
   } else {
     msg.style.color = '#fc8181';
     msg.textContent = '⚠ ' + (result.msg || 'Sin actualizaciones');
+    if (result.debug) {
+      msg.textContent += ' | API responde: ' + result.debug;
+    }
   }
 }
 
