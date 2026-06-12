@@ -374,63 +374,54 @@ async function syncResultsFromAPI(manualDate) {
     return { synced: 0, msg: 'El Mundial aún no ha comenzado' };
   }
 
-  // Try wc2026api.com first (free, specific to WC2026)
+  // Source 1: github.com/rezarahiminia/worldcup2026 — free, no API key, open source
   try {
-    const url = manualDate
-      ? 'https://api.wc2026api.com/matches?status=FT,AET,PEN,1H,2H,HT,ET,P'
-      : 'https://api.wc2026api.com/matches?status=FT,AET,PEN,1H,2H,HT,ET,P';
-    
-    const res = await fetch(url);
+    const res = await fetch('https://worldcup2026-api.vercel.app/api/matches');
     if (res.ok) {
       const json = await res.json();
-      const matches = Array.isArray(json) ? json : (json.data || json.matches || []);
-      
-      if (matches.length > 0) {
-        let synced = 0;
-        for (const f of matches) {
-          // wc2026api fields: home_team, away_team, home_score, away_score, status, kickoff_utc
-          const apiTeam1 = f.home_team;
-          const apiTeam2 = f.away_team;
-          const apiDate = (f.kickoff_utc || f.date || '').split('T')[0];
-          const apiStatus = f.status === 'FT' ? 'FT' : f.status === 'LIVE' ? '2H' : f.status;
-          const goals1 = f.home_score ?? f.score_home ?? null;
-          const goals2 = f.away_score ?? f.score_away ?? null;
-          if (goals1 === null) continue;
-
-          // Match to our local matches by team name
-          let local = allMatches.find(m => {
-            const mDate = new Date(m.date).toISOString().split('T')[0];
-            const sameDateOrClose = !apiDate || Math.abs(new Date(mDate) - new Date(apiDate)) < 2*86400000;
-            return sameDateOrClose && (
-              m.team1.toLowerCase().includes(apiTeam1?.toLowerCase().split(' ')[0]) ||
-              apiTeam1?.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
-            );
-          });
-
-          if (!local) continue;
-          await sb.from('matches').update({ status: apiStatus || 'FT', goals1, goals2 }).eq('id', local.id);
-          local.status = apiStatus || 'FT';
-          local.goals1 = goals1;
-          local.goals2 = goals2;
-          synced++;
-        }
-        if (synced > 0) {
-          console.log('Synced', synced, 'from wc2026api.com');
-          return { synced };
-        }
+      const matches = Array.isArray(json) ? json : (json.matches || json.data || []);
+      const done = matches.filter(f => ['FT','AET','PEN','FINISHED','finished','completed'].includes(f.status) || f.home_score !== null);
+      if (done.length > 0) {
+        const synced = await applyResults(done, m => ({
+          team1: m.home_team || m.home || m.team_home,
+          team2: m.away_team || m.away || m.team_away,
+          date: m.date || m.kickoff || m.kickoff_utc || m.datetime,
+          goals1: m.home_score ?? m.home_goals ?? m.score_home,
+          goals2: m.away_score ?? m.away_goals ?? m.score_away,
+          status: mapStatus(m.status)
+        }));
+        if (synced > 0) return { synced, source: 'worldcup2026-api' };
       }
     }
-  } catch(e) {
-    console.warn('wc2026api failed, trying API-Football:', e);
-  }
+  } catch(e) { console.warn('Source 1 failed:', e.message); }
 
-  // Fallback: API-Football
+  // Source 2: worldcup26.ir — free, open source
+  try {
+    const res = await fetch('https://worldcup26.ir/api/matches');
+    if (res.ok) {
+      const json = await res.json();
+      const matches = Array.isArray(json) ? json : (json.matches || json.data || []);
+      const done = matches.filter(f => f.status === 'completed' || f.home_score !== null || f.finished);
+      if (done.length > 0) {
+        const synced = await applyResults(done, m => ({
+          team1: m.home_team || m.home,
+          team2: m.away_team || m.away,
+          date: m.date || m.datetime,
+          goals1: m.home_score ?? m.goals_home,
+          goals2: m.away_score ?? m.goals_away,
+          status: mapStatus(m.status)
+        }));
+        if (synced > 0) return { synced, source: 'worldcup26.ir' };
+      }
+    }
+  } catch(e) { console.warn('Source 2 failed:', e.message); }
+
+  // Source 3: API-Football (requires paid plan for 2026 — kept as last resort)
   try {
     const dates = manualDate ? [manualDate] : [
       new Date().toISOString().split('T')[0],
       new Date(Date.now() - 86400000).toISOString().split('T')[0]
     ];
-
     let allFixtures = [];
     for (const date of dates) {
       const res = await fetch(
@@ -439,42 +430,61 @@ async function syncResultsFromAPI(manualDate) {
       );
       if (!res.ok) continue;
       const json = await res.json();
+      if (json.errors?.plan) return { synced: 0, msg: 'API-Football: plan gratuito no incluye 2026. Usa el botón Editar en Admin.' };
       if (json.response?.length) allFixtures = allFixtures.concat(json.response);
     }
-
-    if (!allFixtures.length) return { synced: 0, msg: 'Sin datos en las APIs. Verifica la fecha o usa Admin para editar manualmente.' };
-
     const liveStatuses = ['FT','AET','PEN','1H','2H','HT','ET','BT','P'];
     const updates = allFixtures.filter(f => liveStatuses.includes(f.fixture.status.short));
-    if (!updates.length) {
-      const statuses = [...new Set(allFixtures.map(f => f.fixture.status.short))];
-      return { synced: 0, msg: allFixtures.length + ' partidos en API-Football con estado: ' + statuses.join(', ') };
+    if (updates.length) {
+      const synced = await applyResults(updates, f => ({
+        team1: f.teams.home.name,
+        team2: f.teams.away.name,
+        date: f.fixture.date,
+        goals1: f.goals.home,
+        goals2: f.goals.away,
+        status: f.fixture.status.short
+      }));
+      if (synced > 0) return { synced, source: 'api-football' };
     }
+  } catch(e) { console.warn('API-Football failed:', e.message); }
 
-    let synced = 0;
-    for (const f of updates) {
-      const apiTeam1 = f.teams.home.name;
-      const apiTeam2 = f.teams.away.name;
-      const apiDate = f.fixture.date.split('T')[0];
-      let local = allMatches.find(m => {
-        const mDate = new Date(m.date).toISOString().split('T')[0];
-        return mDate === apiDate && (
-          m.team1.toLowerCase().includes(apiTeam1.toLowerCase().split(' ')[0]) ||
-          apiTeam1.toLowerCase().includes(m.team1.toLowerCase().split(' ')[0])
-        );
-      });
-      if (!local) continue;
-      const updateData = { status: f.fixture.status.short, goals1: f.goals.home, goals2: f.goals.away };
-      await sb.from('matches').update(updateData).eq('id', local.id);
-      local.status = updateData.status;
-      local.goals1 = updateData.goals1;
-      local.goals2 = updateData.goals2;
-      synced++;
-    }
-    return { synced };
-  } catch(e) {
-    return { synced: 0, msg: 'Error de conexión. Usa Admin → Partidos para editar manualmente.' };
+  return { synced: 0, msg: 'Ninguna API devolvió resultados. Usa Admin → ✏️ Editar para ingresar manualmente.' };
+}
+
+function mapStatus(s) {
+  if (!s) return 'NS';
+  s = s.toLowerCase();
+  if (['ft','finished','completed','full_time'].includes(s)) return 'FT';
+  if (['1h','first_half','in_play'].includes(s)) return '2H';
+  if (['ht','half_time'].includes(s)) return 'HT';
+  if (['aet','extra_time'].includes(s)) return 'AET';
+  if (['pen','penalties'].includes(s)) return 'PEN';
+  return s.toUpperCase();
+}
+
+async function applyResults(fixtures, mapper) {
+  let synced = 0;
+  for (const f of fixtures) {
+    const mapped = mapper(f);
+    if (mapped.goals1 === null || mapped.goals1 === undefined) continue;
+    const apiDate = mapped.date ? mapped.date.split('T')[0] : null;
+    const nameKey = (mapped.team1 || '').toLowerCase().split(' ')[0];
+    let local = allMatches.find(m => {
+      const mDate = new Date(m.date).toISOString().split('T')[0];
+      const dateOk = !apiDate || Math.abs(new Date(mDate) - new Date(apiDate)) <= 2 * 86400000;
+      return dateOk && (
+        m.team1.toLowerCase().includes(nameKey) ||
+        nameKey.includes(m.team1.toLowerCase().split(' ')[0])
+      );
+    });
+    if (!local) continue;
+    await sb.from('matches').update({ status: mapped.status, goals1: mapped.goals1, goals2: mapped.goals2 }).eq('id', local.id);
+    local.status = mapped.status;
+    local.goals1 = mapped.goals1;
+    local.goals2 = mapped.goals2;
+    synced++;
   }
+  return synced;
 }
 
 async function loadMatches() {
