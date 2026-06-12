@@ -500,10 +500,6 @@ async function loadMatches() {
   const { data: preds } = await sb.from('predictions').select('*, profiles(name,nickname)').in('match_id', ids);
   allPredictions = preds || [];
   renderMatches();
-  // Try auto-sync in background with 5s timeout - won't block rendering
-  syncWithTimeout(5000).then(result => {
-    if (result.synced > 0) renderMatches();
-  }).catch(() => {}); // silent fail
 }
 
 async function syncWithTimeout(ms) {
@@ -565,7 +561,7 @@ function renderMatches() {
   const today = new Date();
   const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const days = byRound[round];
     const roundId = 'round-' + round.replace(/ /g,'_');
     const allRoundMatches = Object.values(days).flat();
@@ -1234,6 +1230,91 @@ function adminShowTab(tab) {
   if (tab === 'usuarios') loadAdmin();
 }
 
+const TEAM_MAP = {
+  'Mexico':'México','South Africa':'Sudáfrica','South Korea':'Corea del Sur',
+  'Czech Republic':'Rep. Checa','Canada':'Canadá','Bosnia & Herzegovina':'Bosnia y Herzegovina',
+  'Qatar':'Qatar','Switzerland':'Suiza','Brazil':'Brasil','Morocco':'Marruecos',
+  'Haiti':'Haití','Scotland':'Escocia','Australia':'Australia','Turkey':'Turquía','Türkiye':'Turquía',
+  'Germany':'Alemania','Curaçao':'Curazao','Netherlands':'Países Bajos','Japan':'Japón',
+  "Côte d'Ivoire":'Costa de Marfil','Ecuador':'Ecuador','Sweden':'Suecia','Tunisia':'Túnez',
+  'Spain':'España','Cape Verde':'Cabo Verde','Saudi Arabia':'Arabia Saudita','Uruguay':'Uruguay',
+  'Iran':'Irán','New Zealand':'Nueva Zelanda','Belgium':'Bélgica','Egypt':'Egipto',
+  'France':'Francia','Senegal':'Senegal','Iraq':'Irak','Norway':'Noruega',
+  'Argentina':'Argentina','Algeria':'Argelia','Austria':'Austria','Jordan':'Jordania',
+  'Portugal':'Portugal','DR Congo':'RD del Congo','England':'Inglaterra','Croatia':'Croacia',
+  'Ghana':'Ghana','Panama':'Panamá','Uzbekistan':'Uzbekistán','Colombia':'Colombia',
+  'USA':'Estados Unidos','Paraguay':'Paraguay'
+};
+
+function parseUtcFromStr(dateStr, timeStr) {
+  const m = timeStr.match(/(\d+):(\d+)\s+UTC([+-]\d+)/);
+  if (!m) return null;
+  const [,h,mn,off] = m;
+  const offsetMs = parseInt(off) * 3600000;
+  const local = new Date(dateStr + 'T' + String(h).padStart(2,'0') + ':' + String(mn).padStart(2,'0') + ':00.000Z');
+  return new Date(local.getTime() - offsetMs);
+}
+
+async function syncFromGitHub() {
+  const btn = document.getElementById('github-sync-btn');
+  const msg = document.getElementById('github-sync-msg');
+  btn.textContent = '⏳ Sincronizando...';
+  btn.disabled = true;
+  msg.style.color = '#9988bb';
+  msg.textContent = 'Descargando datos desde GitHub...';
+
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json');
+    if (!res.ok) throw new Error('No se pudo descargar el archivo');
+    const data = await res.json();
+    const matches = data.matches || [];
+
+    let updated = 0, withResults = 0;
+    for (const m of matches) {
+      const team1 = TEAM_MAP[m.team1] || m.team1;
+      const team2 = TEAM_MAP[m.team2] || m.team2;
+      const utcDt = parseUtcFromStr(m.date, m.time || '12:00 UTC+0');
+      if (!utcDt) continue;
+      const dateStr = utcDt.toISOString();
+      const ft = m.score?.ft;
+      const hasResult = ft && ft.length === 2;
+
+      const updateData = { date: dateStr };
+      if (hasResult) {
+        updateData.goals1 = ft[0];
+        updateData.goals2 = ft[1];
+        updateData.status = 'FT';
+        withResults++;
+      }
+
+      // Find match in local state and update DB
+      const local = allMatches.find(lm =>
+        lm.team1 === team1 && lm.team2 === team2
+      );
+      if (!local) continue;
+
+      await sb.from('matches').update(updateData).eq('id', local.id);
+      Object.assign(local, updateData);
+      updated++;
+
+      if (updated % 10 === 0) {
+        msg.textContent = '⏳ Actualizando... ' + updated + '/' + matches.length;
+      }
+    }
+
+    msg.style.color = '#7BC829';
+    msg.textContent = '✓ ' + updated + ' partidos actualizados, ' + withResults + ' con resultado';
+    await loadMatches();
+    await renderAdminMatchesList();
+  } catch(e) {
+    msg.style.color = '#fc8181';
+    msg.textContent = '⚠ Error: ' + e.message;
+  }
+
+  btn.textContent = '📅 Sync desde GitHub';
+  btn.disabled = false;
+}
+
 async function manualSync() {
   const btn = document.getElementById('sync-api-btn');
   const dateInput = document.getElementById('sync-date-input');
@@ -1513,16 +1594,7 @@ sb.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) initApp(session.user);
 });
 
-// Auto-refresh each 2 min if there are live matches, with timeout protection
-setInterval(async () => {
-  if (!currentUser) return;
-  const hasLive = allMatches.some(m => ['1H','2H','HT','ET','BT','P'].includes(m.status));
-  if (hasLive) {
-    syncWithTimeout(5000).then(result => {
-      if (result?.synced > 0) renderMatches();
-    }).catch(() => {});
-  }
-}, 2 * 60 * 1000);
+// Auto-sync solo desde Admin → Partidos → Sincronizar
 </script>
 </body>
 </html>
