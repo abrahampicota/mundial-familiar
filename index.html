@@ -565,7 +565,7 @@ function renderMatches() {
   const today = new Date();
   const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const days = byRound[round];
     const roundId = 'round-' + round.replace(/ /g,'_');
     const allRoundMatches = Object.values(days).flat();
@@ -1238,28 +1238,54 @@ async function manualSync() {
   const btn = document.getElementById('sync-api-btn');
   const dateInput = document.getElementById('sync-date-input');
   const msg = document.getElementById('sync-msg');
-  const date = dateInput.value || null;
+  const selectedDate = dateInput.value || null;
+  const todayPanama = new Date(Date.now() - 5*60*60*1000).toISOString().split('T')[0];
+  const isToday = selectedDate === todayPanama;
+
   btn.textContent = '⏳ Sincronizando...';
   btn.disabled = true;
   msg.textContent = '';
   msg.style.color = '';
 
-  const result = await syncResultsFromAPI(date);
+  let totalSynced = 0;
 
-  btn.textContent = '🔄 Sincronizar con API';
+  if (isToday) {
+    // Sync all days from WC start to today
+    const wcStart = new Date('2026-06-11');
+    const today = new Date(todayPanama);
+    const dates = [];
+    for (let d = new Date(wcStart); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    msg.style.color = '#9988bb';
+    msg.textContent = '⏳ Sincronizando ' + dates.length + ' días desde el inicio del Mundial...';
+    for (const date of dates) {
+      const result = await syncResultsFromAPI(date);
+      totalSynced += result.synced || 0;
+    }
+  } else {
+    const result = await syncResultsFromAPI(selectedDate);
+    totalSynced = result.synced || 0;
+    if (totalSynced === 0) {
+      msg.style.color = '#fc8181';
+      msg.textContent = '⚠ ' + (result.msg || 'Sin actualizaciones para esa fecha');
+      btn.textContent = '🔄 Sincronizar';
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  btn.textContent = '🔄 Sincronizar';
   btn.disabled = false;
 
-  if (result.synced > 0) {
+  if (totalSynced > 0) {
     msg.style.color = '#7BC829';
-    msg.textContent = '✓ ' + result.synced + ' partido(s) actualizado(s)';
+    msg.textContent = '✓ ' + totalSynced + ' partido(s) actualizado(s)';
     await loadMatches();
-    loadAdminMatches();
+    await renderAdminMatchesList();
   } else {
     msg.style.color = '#fc8181';
-    msg.textContent = '⚠ ' + (result.msg || 'Sin actualizaciones');
-    if (result.debug) {
-      msg.textContent += ' | API responde: ' + result.debug;
-    }
+    msg.textContent = '⚠ Sin resultados disponibles en las APIs. Usa ✏️ Editar para ingresar manualmente.';
   }
 }
 
@@ -1298,7 +1324,7 @@ async function renderAdminMatchesList() {
     byRound[r].push(m);
   });
 
-  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const roundMatches = byRound[round];
     return '<div style="margin-bottom:1rem;">'
       + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#7a9a7a;letter-spacing:1px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid #2a382a;">' + round + '</div>'
