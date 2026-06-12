@@ -206,7 +206,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
       </div>
       <div class="legend">
         <span class="pts-badge pts-exact">+5 pts</span> Marcador exacto &nbsp;
-        <span class="pts-badge pts-outcome">+3 pts</span> Ganador/empate &nbsp;
+        <span class="pts-badge pts-outcome">+3 pts</span> Ganador &nbsp;
+        <span class="pts-badge" style="background:#0a1a30;color:#00C8C8;border:1px solid #00C8C8;">+2 pts</span> Empate &nbsp;
         <span class="pts-badge pts-wrong">0 pts</span> Fallo
       </div>
       <div id="matches-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
@@ -248,11 +249,15 @@ const ADMIN_EMAIL = 'abrahampicota@gmail.com';
 let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [];
 
 // ── PUNTAJE ───────────────────────────────────────────
-// 5 pts = marcador exacto, 3 pts = ganador/empate correcto, 0 = fallo
+// 5 pts = marcador exacto, 3 pts = acertó ganador, 2 pts = acertó empate, 0 = fallo
 function calcPts(pred1, pred2, real1, real2) {
   if (real1 === null || real2 === null || pred1 === null || pred2 === null) return null;
   if (pred1 === real1 && pred2 === real2) return 5;
-  if (getOutcome(pred1, pred2) === getOutcome(real1, real2)) return 3;
+  const predOutcome = getOutcome(pred1, pred2);
+  const realOutcome = getOutcome(real1, real2);
+  if (predOutcome === realOutcome) {
+    return realOutcome === 'empate' ? 2 : 3;
+  }
   return 0;
 }
 
@@ -363,27 +368,36 @@ function showTab(name, btn) {
 }
 
 // ── MATCHES ───────────────────────────────────────────
-async function syncResultsFromAPI() {
-  // Only sync AFTER the World Cup first match starts (June 11, 2026 at 18:00 UTC)
+async function syncResultsFromAPI(manualDate) {
   const wcStart = new Date('2026-06-11T18:00:00Z');
   if (new Date() < wcStart) {
     console.log('Mundial not started yet, skipping API sync');
-    return;
+    return { synced: 0 };
   }
 
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const res = await fetch(
-      'https://v3.football.api-sports.io/fixtures?league=1&season=2026&date=' + today,
-      { headers: { 'x-apisports-key': 'd24e40ac1dfb8c75b7c6584dfd75d353' } }
-    );
-    if (!res.ok) return;
-    const json = await res.json();
-    if (!json.response || !json.response.length) return;
+    // If manual date provided use it, otherwise fetch today AND yesterday (to catch late finishes)
+    const dates = manualDate ? [manualDate] : [
+      new Date().toISOString().split('T')[0],
+      new Date(Date.now() - 86400000).toISOString().split('T')[0]
+    ];
+
+    let allFixtures = [];
+    for (const date of dates) {
+      const res = await fetch(
+        'https://v3.football.api-sports.io/fixtures?league=1&season=2026&date=' + date,
+        { headers: { 'x-apisports-key': 'd24e40ac1dfb8c75b7c6584dfd75d353' } }
+      );
+      if (!res.ok) continue;
+      const json = await res.json();
+      if (json.response?.length) allFixtures = allFixtures.concat(json.response);
+    }
+
+    if (!allFixtures.length) return { synced: 0, msg: 'Sin partidos en la API para esas fechas' };
 
     const liveStatuses = ['FT','AET','PEN','1H','2H','HT','ET','BT','P'];
-    const updates = json.response.filter(f => liveStatuses.includes(f.fixture.status.short));
-    if (!updates.length) return;
+    const updates = allFixtures.filter(f => liveStatuses.includes(f.fixture.status.short));
+    if (!updates.length) return { synced: 0, msg: 'Sin resultados disponibles aún' };
 
     // Match API results to our matches
     for (const f of updates) {
@@ -433,9 +447,11 @@ async function syncResultsFromAPI() {
       local.goals2 = updateData.goals2;
       if (isPlaceholder) { local.team1 = apiTeam1; local.team2 = apiTeam2; }
     }
-    console.log('Synced results from API');
+    console.log('Synced', updates.length, 'results from API');
+    return { synced: updates.length };
   } catch(e) {
     console.warn('API sync failed:', e);
+    return { synced: 0, msg: 'Error de conexión con la API' };
   }
 }
 
@@ -506,7 +522,7 @@ function renderMatches() {
   const today = new Date();
   const todayPanama = new Date(today.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const days = byRound[round];
     const roundId = 'round-' + round.replace(/ /g,'_');
     const allRoundMatches = Object.values(days).flat();
@@ -856,6 +872,15 @@ function getRoundDeadline(round) {
   return rd ? rd.deadline : new Date('2026-06-11T18:00:00Z');
 }
 
+function getMatchDeadline(m) {
+  // For group stage: deadline is the match's own kick-off time
+  // For knockout rounds: deadline is the round's deadline
+  if ((m.round || 'Grupos') === 'Grupos') {
+    return new Date(m.date); // lock at kick-off
+  }
+  return getRoundDeadline(m.round);
+}
+
 function getRoundStartDate(round) {
   const rd = ROUND_DATES[round];
   return rd ? rd.start : null;
@@ -884,9 +909,10 @@ function matchCard(m) {
     let ptsBadge = '';
     if (pts === 5) ptsBadge = '<span class="pts-badge pts-exact">+5 pts ⭐ Exacto!</span>';
     else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3 pts ✓ Ganador</span>';
+    else if (pts === 2) ptsBadge = '<span class="pts-badge" style="background:#001a1a;color:#00C8C8;border:1px solid #00C8C8;">+2 pts 〰 Empate</span>';
     else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0 pts ✗</span>';
     else ptsBadge = '<span class="pts-badge pts-pending">Pendiente</span>';
-    const deadline = getRoundDeadline(m.round || 'Grupos');
+    const deadline = getMatchDeadline(m);
     const roundActive = isRoundActive(m.round || 'Grupos');
     const canEdit = roundActive && new Date() < deadline && !done;
     const borderColor = pts === 5 ? '#00875A' : pts === 3 ? '#5a5000' : pts === 0 ? '#742a2a' : '#00875A';
@@ -903,7 +929,7 @@ function matchCard(m) {
       </div>`;
   } else if (!done) {
     // Can edit until June 11 2026 00:00 UTC-5 (Panama)
-    const deadline = getRoundDeadline(m.round || 'Grupos');
+    const deadline = getMatchDeadline(m);
     const roundActive = isRoundActive(m.round || 'Grupos');
     const canEdit = roundActive && new Date() < deadline;
     predHtml = `
@@ -922,7 +948,7 @@ function matchCard(m) {
         </div>
         ${canEdit
           ? '<button class="btn-save-pred" onclick="savePred(' + m.id + ')">Guardar pronóstico</button>'
-          : '<div style="text-align:center;font-size:12px;color:#fc8181;padding:6px 0;">⏰ Plazo vencido — el Mundial ya comenzó</div>'
+          : '<div style="text-align:center;font-size:12px;color:#fc8181;padding:6px 0;">⏰ Pronósticos cerrados — partido iniciado</div>'
         }
       </div>`;
   } else {
@@ -960,8 +986,9 @@ function matchCard(m) {
     const isMe = p.user_id === currentUser.id;
     const nick = p.profiles?.nickname || p.profiles?.name || '?';
     let bg, border, ptsTxt, ptsColor, ptsBg;
-    if (p.pts === 5)      { bg='#1a0010'; border='#7BC829'; ptsTxt='+5 ⭐'; ptsColor='#7BC829'; ptsBg='#0a1a00'; }
+    if (p.pts === 5)      { bg='#0a1a00'; border='#7BC829'; ptsTxt='+5 ⭐'; ptsColor='#7BC829'; ptsBg='#0a1a00'; }
     else if (p.pts === 3) { bg='#0a0020'; border='#2B4EAF'; ptsTxt='+3 ✓'; ptsColor='#FFE600'; ptsBg='#0a0a30'; }
+    else if (p.pts === 2) { bg='#001a1a'; border='#00C8C8'; ptsTxt='+2 〰'; ptsColor='#00C8C8'; ptsBg='#001a1a'; }
     else if (p.pts === 0) { bg='#1a0008'; border='#8B1A2A'; ptsTxt='0';     ptsColor='#fc8181'; ptsBg='#1a0008'; }
     else                  { bg='var(--surface2)'; border='var(--border)'; ptsTxt='—'; ptsColor='var(--text-muted)'; ptsBg='var(--surface2)'; }
     const predScore = (p.pred_goals1 !== null && p.pred_goals2 !== null)
@@ -1117,6 +1144,7 @@ async function renderProfile() {
         let ptsBadge = '';
         if (pts===5) ptsBadge='<span class="pts-badge pts-exact">+5 ⭐</span>';
         else if (pts===3) ptsBadge='<span class="pts-badge pts-outcome">+3 ✓</span>';
+        else if (pts===2) ptsBadge='<span class="pts-badge" style="background:#001a1a;color:#00C8C8;border:1px solid #00C8C8;">+2 〰</span>';
         else if (pts===0) ptsBadge='<span class="pts-badge pts-wrong">0 pts</span>';
         else ptsBadge='<span class="pts-badge pts-pending">Pendiente</span>';
         return `<div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;">
@@ -1151,12 +1179,58 @@ function adminShowTab(tab) {
   if (tab === 'usuarios') loadAdmin();
 }
 
+async function manualSync() {
+  const btn = document.getElementById('sync-api-btn');
+  const dateInput = document.getElementById('sync-date-input');
+  const msg = document.getElementById('sync-msg');
+  const date = dateInput.value || null;
+  btn.textContent = '⏳ Sincronizando...';
+  btn.disabled = true;
+  msg.textContent = '';
+  msg.style.color = '';
+
+  const result = await syncResultsFromAPI(date);
+
+  btn.textContent = '🔄 Sincronizar con API';
+  btn.disabled = false;
+
+  if (result.synced > 0) {
+    msg.style.color = '#7BC829';
+    msg.textContent = '✓ ' + result.synced + ' partido(s) actualizado(s)';
+    await loadMatches();
+    loadAdminMatches();
+  } else {
+    msg.style.color = '#fc8181';
+    msg.textContent = '⚠ ' + (result.msg || 'Sin actualizaciones');
+  }
+}
+
 async function loadAdminMatches() {
   const container = document.getElementById('admin-matches-container');
-  container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando partidos...</div>';
+
+  // Default date = today in Panama (UTC-5)
+  const todayPanama = new Date(Date.now() - 5*60*60*1000).toISOString().split('T')[0];
+
+  container.innerHTML = '<div class="card" style="margin-bottom:1rem;">'
+    + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:10px;">🔄 SINCRONIZAR RESULTADOS DESDE API</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Trae los resultados oficiales de la API para la fecha seleccionada. Por defecto sincroniza hoy y ayer.</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+      + '<input id="sync-date-input" type="date" value="'+todayPanama+'" style="flex:1;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;min-width:140px;" />'
+      + '<button id="sync-api-btn" onclick="manualSync()" style="padding:8px 16px;background:#E8231A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;">🔄 Sincronizar con API</button>'
+    + '</div>'
+    + '<div id="sync-msg" style="font-size:13px;min-height:18px;"></div>'
+  + '</div>'
+  + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
+
+  await renderAdminMatchesList();
+}
+
+async function renderAdminMatchesList() {
+  const listContainer = document.getElementById('admin-matches-list');
+  if (!listContainer) return;
 
   const { data: matches } = await sb.from('matches').select('*').order('date', { ascending: true });
-  if (!matches) { container.innerHTML = '<div class="empty">Error cargando.</div>'; return; }
+  if (!matches) { listContainer.innerHTML = '<div class="empty">Error cargando.</div>'; return; }
 
   const roundOrder = ['Grupos','Dieciseisavos','Octavos','Cuartos','Semifinal','Tercer Puesto','Final'];
   const byRound = {};
@@ -1166,7 +1240,7 @@ async function loadAdminMatches() {
     byRound[r].push(m);
   });
 
-  container.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
+  listContainer.innerHTML = roundOrder.filter(r => byRound[r]).map(round => {
     const roundMatches = byRound[round];
     return '<div style="margin-bottom:1rem;">'
       + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#7a9a7a;letter-spacing:1px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid #2a382a;">' + round + '</div>'
