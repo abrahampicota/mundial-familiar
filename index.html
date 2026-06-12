@@ -226,6 +226,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
     </div>
     <div id="tab-campeon" class="section">
       <div class="section-title">🏆 Predicción del Campeón</div>
+      <div style="background:#0a0020;border:1px solid #2B4EAF;border-radius:12px;padding:14px 16px;margin-bottom:1rem;font-size:13px;line-height:1.6;color:#f0eeff;">
+        ⚽ <strong>¿Cómo funciona?</strong><br>
+        Elige el equipo que crees que ganará el Mundial 2026. Puedes cambiar tu predicción cuantas veces quieras hasta que empiece la Final el <strong>19 de julio a las 5:00 PM hora Panamá</strong>. Si aciertas el campeón, ¡ganas <strong style="color:#FFE600;">+10 puntos</strong> extra en la tabla! 🏆
+      </div>
       <div id="campeon-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
     <div id="tab-admin" class="section">
@@ -644,7 +648,7 @@ async function loadCampeon() {
 
   const { data: picks } = await sb.from('champion_picks').select('*, profiles(name,nickname)');
   const myPick = (picks||[]).find(p => p.user_id === currentUser.id);
-  const deadline = new Date('2026-06-11T18:00:00Z');
+  const deadline = new Date('2026-07-19T22:00:00Z'); // Final: 19 jul 5pm Panama
   const canPick = new Date() < deadline;
 
   // Get teams from group stage
