@@ -34,13 +34,13 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-header { background: var(--surface); border-bottom: 3px solid var(--accent); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
-.logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px; color: var(--yellow); }
+header { background: var(--surface); border-bottom: 3px solid var(--accent); padding: 0 1rem; display: flex; align-items: center; justify-content: space-between; height: 50px; position: sticky; top: 0; z-index: 100; }
+.logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; color: var(--yellow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
 .logo span { color: var(--text); }
 nav { display: flex; gap: 4px; padding: 1rem 1.5rem 0; border-bottom: 1px solid var(--border); background: var(--surface); overflow-x: auto; }
-.nav-btn { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; padding: 8px 20px; border: none; background: none; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+.nav-btn { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 0.5px; padding: 8px 12px; border: none; background: none; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
 .nav-btn.active { color: var(--yellow); border-bottom-color: var(--accent); }
-main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .section { display: none; } .section.active { display: block; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
 .match-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -97,7 +97,7 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .btn-logout { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-.legend { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; font-size: 12px; color: var(--text-muted); align-items: center; }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 11px; color: var(--text-muted); align-items: center; }
 #app { display: none; }
 #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 380px; text-align: center; }
@@ -127,6 +127,22 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .confirm-btns { display: flex; gap: 8px; }
 .confirm-btn-cancel { flex: 1; padding: 9px; border: 1px solid #2a382a; border-radius: 8px; background: none; color: #7a9a7a; font-size: 14px; cursor: pointer; }
 .confirm-btn-ok { flex: 1; padding: 9px; border: none; border-radius: 8px; background: #742a2a; color: #fc8181; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+@media (max-width: 480px) {
+  .logo { font-size: 1rem; letter-spacing: 0.5px; }
+  .nav-btn { font-size: 0.75rem; padding: 7px 8px; letter-spacing: 0; }
+  .section-title { font-size: 1.3rem; }
+  .match-card { padding: 1rem 0.75rem; }
+  .team-name { font-size: 1rem; }
+  .score { font-size: 1.2rem; }
+  .lb-pts-num { font-size: 1.4rem; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .countdown-grid { gap: 6px; }
+  .countdown-num { font-size: 1.6rem; }
+  .login-box { padding: 1.5rem 1rem; }
+  .login-logo { font-size: 2.2rem; }
+  main { padding: 0.75rem 0.5rem; }
+}
 </style>
 </head>
 <body>
@@ -184,9 +200,9 @@ main { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 
 <div id="app">
   <header>
-    <div class="logo"><img src="trophy.png" alt="FIFA World Cup Trophy" style="height:36px;width:auto;vertical-align:middle;margin-right:6px;">FIFA <span>2026 · MEX CAN USA</span></div>
+    <div class="logo"><img src="trophy.png" alt="FIFA World Cup Trophy" style="height:28px;width:auto;vertical-align:middle;margin-right:4px;">FIFA <span>2026 · MEX CAN USA</span></div>
     <div style="display:flex;align-items:center;gap:10px;">
-      <strong id="header-name" style="font-size:14px;"></strong>
+      <strong id="header-name" style="font-size:12px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;"></strong>
       <button class="btn-logout" onclick="logout()">Salir</button>
     </div>
   </header>
