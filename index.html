@@ -1243,88 +1243,6 @@ function parseUtcFromStr(dateStr, timeStr) {
   return new Date(local.getTime() - offsetMs);
 }
 
-const BDL_KEY = '623d9e47-0f2d-4a6f-939e-41b7cf7ee365';
-
-async function syncFromBDL() {
-  const btn = document.getElementById('bdl-sync-btn');
-  const msg = document.getElementById('bdl-sync-msg');
-  btn.textContent = '⏳ Sincronizando...';
-  btn.disabled = true;
-  msg.style.color = '#9988bb';
-  msg.textContent = 'Conectando con BallDontLie...';
-
-  try {
-    // Fetch all finished games
-    const res = await fetch('https://api.balldontlie.io/fifa/worldcup/v1/games?per_page=100', {
-      headers: { 'Authorization': BDL_KEY },
-      signal: AbortSignal.timeout(8000)
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'HTTP ' + res.status);
-    }
-
-    const json = await res.json();
-    const games = json.data || [];
-    
-    if (!games.length) {
-      msg.style.color = '#fc8181';
-      msg.textContent = '⚠ Sin partidos en BallDontLie aún';
-      btn.textContent = '⚽ Sync BallDontLie';
-      btn.disabled = false;
-      return;
-    }
-
-    msg.textContent = '⏳ Procesando ' + games.length + ' partidos...';
-
-    let synced = 0;
-    for (const g of games) {
-      // BallDontLie fields
-      const team1 = g.home_team?.name || g.home_team_name || '';
-      const team2 = g.away_team?.name || g.away_team_name || '';
-      const goals1 = g.home_team_score ?? g.home_score ?? null;
-      const goals2 = g.away_team_score ?? g.away_score ?? null;
-      const rawStatus = g.status || g.game_status || '';
-      const status = ['Final','FT','finished','completed'].includes(rawStatus) ? 'FT'
-        : ['InProgress','live','in_play','1H','2H'].includes(rawStatus) ? '2H'
-        : rawStatus === 'HalfTime' ? 'HT' : 'NS';
-
-      if (goals1 === null) continue;
-
-      // Match to local by team name
-      const nameKey = team1.toLowerCase().split(' ')[0];
-      const local = allMatches.find(m =>
-        m.team1.toLowerCase().includes(nameKey) ||
-        nameKey.includes(m.team1.toLowerCase().split(' ')[0])
-      );
-      if (!local) continue;
-
-      await sb.from('matches').update({ status, goals1, goals2 }).eq('id', local.id);
-      local.status = status;
-      local.goals1 = goals1;
-      local.goals2 = goals2;
-      synced++;
-    }
-
-    msg.style.color = synced > 0 ? '#7BC829' : '#9988bb';
-    msg.textContent = synced > 0
-      ? '✓ ' + synced + ' partidos actualizados desde BallDontLie'
-      : '⚠ Sin resultados nuevos en BallDontLie';
-
-    if (synced > 0) {
-      await loadMatches();
-      await renderAdminMatchesList();
-    }
-  } catch(e) {
-    msg.style.color = '#fc8181';
-    msg.textContent = '⚠ Error: ' + e.message;
-  }
-
-  btn.textContent = '⚽ Sync BallDontLie';
-  btn.disabled = false;
-}
-
 async function syncFromGitHub() {
   const btn = document.getElementById('github-sync-btn');
   const msg = document.getElementById('github-sync-msg');
@@ -1381,7 +1299,7 @@ async function syncFromGitHub() {
     msg.textContent = '⚠ Error: ' + e.message;
   }
 
-  btn.textContent = '📅 Sync desde GitHub';
+  btn.textContent = '⚽ Sync desde GitHub';
   btn.disabled = false;
 }
 
