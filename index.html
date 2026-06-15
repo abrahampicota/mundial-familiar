@@ -1243,90 +1243,85 @@ function parseUtcFromStr(dateStr, timeStr) {
   return new Date(local.getTime() - offsetMs);
 }
 
-async function syncFromWC26() {
-  const btn = document.getElementById('wc26-sync-btn');
-  const msg = document.getElementById('wc26-sync-msg');
+const BDL_KEY = '623d9e47-0f2d-4a6f-939e-41b7cf7ee365';
+
+async function syncFromBDL() {
+  const btn = document.getElementById('bdl-sync-btn');
+  const msg = document.getElementById('bdl-sync-msg');
   btn.textContent = '⏳ Sincronizando...';
   btn.disabled = true;
   msg.style.color = '#9988bb';
-  msg.textContent = 'Conectando con worldcup26.ir...';
+  msg.textContent = 'Conectando con BallDontLie...';
 
-  // Try multiple CORS proxies
-  const proxies = [
-    'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?',
-    'https://cors-anywhere.herokuapp.com/',
-  ];
+  try {
+    // Fetch all finished games
+    const res = await fetch('https://api.balldontlie.io/fifa/worldcup/v1/games?per_page=100', {
+      headers: { 'Authorization': BDL_KEY },
+      signal: AbortSignal.timeout(8000)
+    });
 
-  const targetUrl = 'https://worldcup26.ir/get/games';
-  let data = null;
-
-  for (const proxy of proxies) {
-    try {
-      const res = await fetch(proxy + encodeURIComponent(targetUrl), {
-        signal: AbortSignal.timeout(5000)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        data = Array.isArray(json) ? json : (json.data || json.games || json.matches || []);
-        if (data.length > 0) {
-          msg.textContent = '✓ Conectado via proxy (' + data.length + ' partidos)';
-          break;
-        }
-      }
-    } catch(e) {
-      console.warn('Proxy failed:', proxy, e.message);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + res.status);
     }
-  }
 
-  if (!data || data.length === 0) {
+    const json = await res.json();
+    const games = json.data || [];
+    
+    if (!games.length) {
+      msg.style.color = '#fc8181';
+      msg.textContent = '⚠ Sin partidos en BallDontLie aún';
+      btn.textContent = '⚽ Sync BallDontLie';
+      btn.disabled = false;
+      return;
+    }
+
+    msg.textContent = '⏳ Procesando ' + games.length + ' partidos...';
+
+    let synced = 0;
+    for (const g of games) {
+      // BallDontLie fields
+      const team1 = g.home_team?.name || g.home_team_name || '';
+      const team2 = g.away_team?.name || g.away_team_name || '';
+      const goals1 = g.home_team_score ?? g.home_score ?? null;
+      const goals2 = g.away_team_score ?? g.away_score ?? null;
+      const rawStatus = g.status || g.game_status || '';
+      const status = ['Final','FT','finished','completed'].includes(rawStatus) ? 'FT'
+        : ['InProgress','live','in_play','1H','2H'].includes(rawStatus) ? '2H'
+        : rawStatus === 'HalfTime' ? 'HT' : 'NS';
+
+      if (goals1 === null) continue;
+
+      // Match to local by team name
+      const nameKey = team1.toLowerCase().split(' ')[0];
+      const local = allMatches.find(m =>
+        m.team1.toLowerCase().includes(nameKey) ||
+        nameKey.includes(m.team1.toLowerCase().split(' ')[0])
+      );
+      if (!local) continue;
+
+      await sb.from('matches').update({ status, goals1, goals2 }).eq('id', local.id);
+      local.status = status;
+      local.goals1 = goals1;
+      local.goals2 = goals2;
+      synced++;
+    }
+
+    msg.style.color = synced > 0 ? '#7BC829' : '#9988bb';
+    msg.textContent = synced > 0
+      ? '✓ ' + synced + ' partidos actualizados desde BallDontLie'
+      : '⚠ Sin resultados nuevos en BallDontLie';
+
+    if (synced > 0) {
+      await loadMatches();
+      await renderAdminMatchesList();
+    }
+  } catch(e) {
     msg.style.color = '#fc8181';
-    msg.textContent = '⚠ No se pudo conectar. El servidor bloquea acceso desde el browser. Usa Sync GitHub.';
-    btn.textContent = '🌐 Sync worldcup26.ir';
-    btn.disabled = false;
-    return;
+    msg.textContent = '⚠ Error: ' + e.message;
   }
 
-  // Map worldcup26.ir fields to our format
-  let synced = 0;
-  for (const g of data) {
-    // worldcup26.ir fields (may vary)
-    const team1 = g.home_team || g.home || g.team1;
-    const team2 = g.away_team || g.away || g.team2;
-    const goals1 = g.home_score ?? g.home_goals ?? g.score_home ?? g.goals1;
-    const goals2 = g.away_score ?? g.away_goals ?? g.score_away ?? g.goals2;
-    const status = g.status === 'finished' || g.status === 'FT' || g.status === 'completed' ? 'FT'
-      : g.status === 'live' || g.status === 'in_play' ? '2H'
-      : g.status === 'HT' ? 'HT' : 'NS';
-
-    if (goals1 === null || goals1 === undefined) continue;
-
-    // Match to our local matches by team name
-    const nameKey = (team1 || '').toLowerCase().split(' ')[0];
-    const local = allMatches.find(m =>
-      m.team1.toLowerCase().includes(nameKey) ||
-      nameKey.includes(m.team1.toLowerCase().split(' ')[0])
-    );
-    if (!local) continue;
-
-    await sb.from('matches').update({ status, goals1, goals2 }).eq('id', local.id);
-    local.status = status;
-    local.goals1 = goals1;
-    local.goals2 = goals2;
-    synced++;
-  }
-
-  msg.style.color = synced > 0 ? '#7BC829' : '#fc8181';
-  msg.textContent = synced > 0
-    ? '✓ ' + synced + ' partidos actualizados desde worldcup26.ir'
-    : '⚠ Sin resultados nuevos';
-
-  if (synced > 0) {
-    await loadMatches();
-    await renderAdminMatchesList();
-  }
-
-  btn.textContent = '🌐 Sync worldcup26.ir';
+  btn.textContent = '⚽ Sync BallDontLie';
   btn.disabled = false;
 }
 
@@ -1454,7 +1449,7 @@ async function loadAdminMatches() {
   container.innerHTML = '<div class="card" style="margin-bottom:1rem;">'
     + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:8px;">📅 SINCRONIZAR DESDE GITHUB</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Actualiza fechas y resultados desde openfootball/worldcup.json. Sin límites de peticiones.</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'    + '<button onclick="syncFromWC26()" id="wc26-sync-btn" style="padding:8px 16px;background:#00875A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">🌐 Sync worldcup26.ir</button>'    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync GitHub</button>'    + '</div>'    + '<div id="wc26-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;margin-bottom:4px;"></div>'    + '<div id="github-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;"></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'    + '<button onclick="syncFromBDL()" id="bdl-sync-btn" style="padding:8px 16px;background:#00875A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">🏀 Sync BallDontLie</button>'    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync GitHub</button>'    + '</div>'    + '<div id="bdl-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;margin-bottom:4px;"></div>'    + '<div id="github-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;"></div>'
   + '</div>'
   + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
 
