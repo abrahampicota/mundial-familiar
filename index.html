@@ -597,7 +597,9 @@ function renderMatches() {
       const hasDone = matches.every(m => ['FT','AET','PEN'].includes(m.status));
       const myPreds = matches.filter(m => allPredictions.find(p => p.match_id === m.id && p.user_id === currentUser.id)).length;
       const isPast = day < todayPanama && !hasLive;
-      const isOpen = !isPast || isToday || hasLive;
+      // Only today and live matches open by default — everything else collapsed
+      const defaultDayOpen = isToday || hasLive;
+      const isOpen = defaultDayOpen;
 
       let badge = '';
       if (hasLive) badge = '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;font-size:10px;">⚽ EN VIVO</span>';
@@ -606,7 +608,8 @@ function renderMatches() {
 
       const predBadge = myPreds > 0 ? '<span style="font-size:10px;color:#F5C518">'+myPreds+'/'+matches.length+' ✓</span>' : '<span style="font-size:10px;color:#7a9a7a">0/'+matches.length+'</span>';
       const wasCollapsedDay = collapsed['day-'+day];
-      const finalOpen = wasCollapsedDay !== undefined ? !wasCollapsedDay : isOpen;
+      // Respect manual user preference, otherwise use default
+      const finalOpen = wasCollapsedDay !== undefined ? !wasCollapsedDay : defaultDayOpen;
 
       return '<div class="day-group" style="margin-left:0">'
         + '<div class="day-header" style="background:#0f1a0f;border-radius:8px;" data-target="day-'+day+'" onclick="toggleDay(this)">'
@@ -963,40 +966,31 @@ function matchCard(m) {
     ? `<div class="score-box" style="border-color:#742a2a"><div class="score" style="color:#fc8181">${m.goals1 ?? 0} - ${m.goals2 ?? 0}</div><div style="font-size:10px;color:#fc8181">En juego</div></div>`
     : `<div class="score-box"><div class="score" style="font-size:1rem;color:var(--text-muted)">vs</div></div>`;
 
-  // Prediction input
-  let predHtml = '';
-  if (myPred) {
-    // Already predicted — show result
-    const pts = done ? calcPts(myPred.pred_goals1, myPred.pred_goals2, m.goals1, m.goals2) : null;
-    let ptsBadge = '';
-    if (pts === 5) ptsBadge = '<span class="pts-badge pts-exact">+5 pts ⭐ Exacto!</span>';
-    else if (pts === 3) ptsBadge = '<span class="pts-badge pts-outcome">+3 pts ✓</span>';
-    else if (pts === 0) ptsBadge = '<span class="pts-badge pts-wrong">0 pts ✗</span>';
-    else ptsBadge = '<span class="pts-badge pts-pending">Pendiente</span>';
-    const deadline = getMatchDeadline(m);
-    const roundActive = isRoundActive(m.round || 'Grupos');
-    const canEdit = roundActive && new Date() < deadline && !done;
-    const borderColor = pts === 5 ? '#00875A' : pts === 3 ? '#5a5000' : pts === 0 ? '#742a2a' : '#00875A';
-    const bgColor = pts === 5 ? '#0d2a1a' : pts === 3 ? '#1a1a05' : pts === 0 ? '#1a0808' : '#0d2a1a';
-    predHtml = `
-      <div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:12px;text-align:center;">
-        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;">
-          <span style="font-size:11px;color:#7a9a7a;text-transform:uppercase;letter-spacing:1px;">MI PRONÓSTICO</span>
-          <span style="font-size:14px;color:${borderColor};">✓ Guardado</span>
-        </div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:#F5C518;margin-bottom:6px;">${myPred.pred_goals1} - ${myPred.pred_goals2}</div>
-        ${ptsBadge}
-        ${canEdit ? `<button onclick="editPred(${m.id})" style="margin-top:10px;padding:5px 16px;border:1px solid #2a382a;border-radius:6px;background:none;color:#7a9a7a;font-size:12px;cursor:pointer;">✏️ Editar</button>` : ''}
-      </div>`;
-  } else if (!done) {
-    // Can edit until June 11 2026 00:00 UTC-5 (Panama)
-    const deadline = getMatchDeadline(m);
-    const roundActive = isRoundActive(m.round || 'Grupos');
-    const canEdit = roundActive && new Date() < deadline;
-    predHtml = `
-      <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center;">¿Cuál será el marcador?</div>
-        <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:10px;">
+  // Input form for prediction (shown when no prediction yet and match not started)
+  const deadline = getMatchDeadline(m);
+  const roundActive = isRoundActive(m.round || 'Grupos');
+  const canEdit = roundActive && new Date() < deadline && !done;
+  const matchTeamsConfirmed = !m.team1.startsWith('Ganador') && !m.team1.startsWith('1') &&
+    !m.team1.startsWith('2') && !m.team1.startsWith('3') && !m.team1.startsWith('Perdedor');
+
+  let inputHtml = '';
+  if (!roundActive && !done) {
+    const roundStart = getRoundStartDate(m.round || 'Grupos');
+    const dateStr2 = roundStart ? roundStart.toLocaleDateString('es', { day:'numeric', month:'long' }) : '';
+    inputHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:10px;margin-bottom:8px;">
+      <div style="font-size:18px;margin-bottom:4px;">🔒</div>
+      <div style="font-size:12px;color:#F5C518;">Pronósticos disponibles desde el ${dateStr2}</div>
+    </div>`;
+  } else if (!matchTeamsConfirmed && !done) {
+    inputHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:10px;margin-bottom:8px;">
+      <div style="font-size:18px;margin-bottom:4px;">⏳</div>
+      <div style="font-size:12px;color:#F5C518;">Equipos por confirmarse</div>
+    </div>`;
+  } else if (!myPred && !done) {
+    inputHtml = `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-align:center;text-transform:uppercase;letter-spacing:1px;">¿Cuál será el marcador?</div>
+        <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:8px;">
           <div style="text-align:center;">
             <div class="score-team-label">${m.team1}</div>
             <input class="score-input" id="g1-${m.id}" type="number" min="0" max="20" placeholder="?" ${!canEdit ? 'disabled' : ''} />
@@ -1009,30 +1003,12 @@ function matchCard(m) {
         </div>
         ${canEdit
           ? '<button class="btn-save-pred" onclick="savePred(' + m.id + ')">Guardar pronóstico</button>'
-          : '<div style="text-align:center;font-size:12px;color:#fc8181;padding:6px 0;">⏰ Pronósticos cerrados — partido iniciado</div>'
+          : '<div style="text-align:center;font-size:12px;color:#fc8181;padding:4px 0;">⏰ Pronósticos cerrados</div>'
         }
       </div>`;
-  } else {
-    predHtml = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">No hiciste un pronóstico para este partido</div>`;
-  }
-
-  // If round not active yet, override predHtml with locked message
-  const roundActive2 = isRoundActive(m.round || 'Grupos');
-  const matchTeamsConfirmed = !m.team1.startsWith('Ganador') && !m.team1.startsWith('1') &&
-    !m.team1.startsWith('2') && !m.team1.startsWith('3') && !m.team1.startsWith('Perdedor');
-  if (!roundActive2 && !done) {
-    const roundStart = getRoundStartDate(m.round || 'Grupos');
-    const dateStr2 = roundStart ? roundStart.toLocaleDateString('es', { day:'numeric', month:'long' }) : '';
-    predHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:12px;">
-      <div style="font-size:20px;margin-bottom:6px;">🔒</div>
-      <div style="font-size:13px;color:#F5C518;font-weight:500;">Pronósticos disponibles desde el ${dateStr2}</div>
-      <div style="font-size:11px;color:#7a9a7a;margin-top:4px;">Los equipos se confirmarán al avanzar la ronda anterior</div>
-    </div>`;
-  } else if (!matchTeamsConfirmed && !done) {
-    predHtml = `<div style="text-align:center;background:#1a1a05;border:1px solid #3a3000;border-radius:10px;padding:12px;">
-      <div style="font-size:20px;margin-bottom:6px;">⏳</div>
-      <div style="font-size:13px;color:#F5C518;font-weight:500;">Equipos por confirmarse</div>
-      <div style="font-size:11px;color:#7a9a7a;margin-top:4px;">Disponible cuando avance la ronda anterior</div>
+  } else if (myPred && canEdit) {
+    inputHtml = `<div style="text-align:center;margin-bottom:8px;">
+      <button onclick="editPred(${m.id})" style="padding:5px 14px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);font-size:12px;cursor:pointer;">✏️ Cambiar mi pronóstico</button>
     </div>`;
   }
 
@@ -1061,7 +1037,7 @@ function matchCard(m) {
       +'<div style="width:30px;height:30px;border-radius:50%;background:'+border+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">'+nick[0].toUpperCase()+'</div>'
       +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:500;color:#f0eeff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nick+(isMe?' <span style="font-size:10px;color:var(--text-muted)">(tú)</span>':'')+'</div>'
-        +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">MI PRONÓSTICO: '+predScore+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">Pronosticó: '+predScore+'</div>'
       +'</div>'
       +'<div style="background:'+ptsBg+';border:1px solid '+border+';border-radius:6px;padding:4px 8px;text-align:center;flex-shrink:0">'
         +'<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:'+ptsColor+'">'+ptsTxt+'</div>'
@@ -1074,15 +1050,19 @@ function matchCard(m) {
   const predicted = rankedPreds.length;
   const pendingTxt = !done && predicted < totalPlayers ? ' · '+(totalPlayers - predicted)+' pendiente'+(totalPlayers-predicted>1?'s':'') : '';
 
+  const emptyPredMsg = rankedPreds.length === 0 && roundActive && matchTeamsConfirmed && !done
+    ? '<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:8px 0;">Sé el primero en pronosticar 👆</div>'
+    : '';
+
   const rankingSection = rankedPreds.length > 0 ? (
-    '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">'
-    +'<button onclick="toggleRanking(this)" data-target="r-'+m.id+'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:0;margin-bottom:0;">'
-      +'<span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Pronósticos ('+predicted+'/'+totalPlayers+')'+pendingTxt+'</span>'
-      +'<span id="r-'+m.id+'-icon" style="font-size:12px;color:var(--text-muted)">▼ Ver</span>'
-    +'</button>'
-    +'<div id="r-'+m.id+'" style="display:none;margin-top:8px;">'+rankingRows+'</div>'
+    '<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+        +'<span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Pronósticos ('+predicted+'/'+totalPlayers+')'+pendingTxt+'</span>'
+        +(done ? '<span style="font-size:10px;color:var(--text-muted)">Ordenado por pts</span>' : '')
+      +'</div>'
+      +rankingRows
     +'</div>'
-  ) : '';
+  ) : emptyPredMsg;
 
   return '<div class="match-card">'
     +'<div class="match-meta">'
@@ -1095,7 +1075,7 @@ function matchCard(m) {
       +'<div class="team-name">'+m.team2+'</div>'
     +'</div>'
     +'<div class="pred-section">'
-      +predHtml
+      +inputHtml
       +rankingSection
     +'</div>'
   +'</div>';
@@ -1263,6 +1243,93 @@ function parseUtcFromStr(dateStr, timeStr) {
   return new Date(local.getTime() - offsetMs);
 }
 
+async function syncFromWC26() {
+  const btn = document.getElementById('wc26-sync-btn');
+  const msg = document.getElementById('wc26-sync-msg');
+  btn.textContent = '⏳ Sincronizando...';
+  btn.disabled = true;
+  msg.style.color = '#9988bb';
+  msg.textContent = 'Conectando con worldcup26.ir...';
+
+  // Try multiple CORS proxies
+  const proxies = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://cors-anywhere.herokuapp.com/',
+  ];
+
+  const targetUrl = 'https://worldcup26.ir/get/games';
+  let data = null;
+
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy + encodeURIComponent(targetUrl), {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        data = Array.isArray(json) ? json : (json.data || json.games || json.matches || []);
+        if (data.length > 0) {
+          msg.textContent = '✓ Conectado via proxy (' + data.length + ' partidos)';
+          break;
+        }
+      }
+    } catch(e) {
+      console.warn('Proxy failed:', proxy, e.message);
+    }
+  }
+
+  if (!data || data.length === 0) {
+    msg.style.color = '#fc8181';
+    msg.textContent = '⚠ No se pudo conectar. El servidor bloquea acceso desde el browser. Usa Sync GitHub.';
+    btn.textContent = '🌐 Sync worldcup26.ir';
+    btn.disabled = false;
+    return;
+  }
+
+  // Map worldcup26.ir fields to our format
+  let synced = 0;
+  for (const g of data) {
+    // worldcup26.ir fields (may vary)
+    const team1 = g.home_team || g.home || g.team1;
+    const team2 = g.away_team || g.away || g.team2;
+    const goals1 = g.home_score ?? g.home_goals ?? g.score_home ?? g.goals1;
+    const goals2 = g.away_score ?? g.away_goals ?? g.score_away ?? g.goals2;
+    const status = g.status === 'finished' || g.status === 'FT' || g.status === 'completed' ? 'FT'
+      : g.status === 'live' || g.status === 'in_play' ? '2H'
+      : g.status === 'HT' ? 'HT' : 'NS';
+
+    if (goals1 === null || goals1 === undefined) continue;
+
+    // Match to our local matches by team name
+    const nameKey = (team1 || '').toLowerCase().split(' ')[0];
+    const local = allMatches.find(m =>
+      m.team1.toLowerCase().includes(nameKey) ||
+      nameKey.includes(m.team1.toLowerCase().split(' ')[0])
+    );
+    if (!local) continue;
+
+    await sb.from('matches').update({ status, goals1, goals2 }).eq('id', local.id);
+    local.status = status;
+    local.goals1 = goals1;
+    local.goals2 = goals2;
+    synced++;
+  }
+
+  msg.style.color = synced > 0 ? '#7BC829' : '#fc8181';
+  msg.textContent = synced > 0
+    ? '✓ ' + synced + ' partidos actualizados desde worldcup26.ir'
+    : '⚠ Sin resultados nuevos';
+
+  if (synced > 0) {
+    await loadMatches();
+    await renderAdminMatchesList();
+  }
+
+  btn.textContent = '🌐 Sync worldcup26.ir';
+  btn.disabled = false;
+}
+
 async function syncFromGitHub() {
   const btn = document.getElementById('github-sync-btn');
   const msg = document.getElementById('github-sync-msg');
@@ -1387,8 +1454,7 @@ async function loadAdminMatches() {
   container.innerHTML = '<div class="card" style="margin-bottom:1rem;">'
     + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:8px;">📅 SINCRONIZAR DESDE GITHUB</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Actualiza fechas y resultados desde openfootball/worldcup.json. Sin límites de peticiones.</div>'
-    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync desde GitHub</button>'
-    + '<div id="github-sync-msg" style="font-size:13px;min-height:18px;margin-top:8px;"></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'    + '<button onclick="syncFromWC26()" id="wc26-sync-btn" style="padding:8px 16px;background:#00875A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">🌐 Sync worldcup26.ir</button>'    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync GitHub</button>'    + '</div>'    + '<div id="wc26-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;margin-bottom:4px;"></div>'    + '<div id="github-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;"></div>'
   + '</div>'
   + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
 
