@@ -1677,9 +1677,7 @@ async function loadAdminMatches() {
   container.innerHTML = '<div class="card" style="margin-bottom:1rem;">'
     + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:8px;">📅 SINCRONIZAR DESDE GITHUB</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Actualiza fechas y resultados desde openfootball/worldcup.json. Sin límites de peticiones.</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'    + '<button onclick="syncFromBDL()" id="bdl-sync-btn" style="padding:8px 16px;background:#00875A;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">🏀 Sync BallDontLie</button>'    + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">📅 Sync GitHub</button>'    + '</div>'    + '<div id="bdl-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;margin-bottom:4px;"></div>'    + '<div id="github-sync-msg" style="font-size:12px;min-height:16px;color:#9988bb;"></div>'
-  + '</div>'
-  + '<div class="sync-bar" style="margin-bottom:10px;" id="sync-status-bar">'  + '<div class="sync-dot" id="sync-dot"></div>'  + '<span id="sync-status-text">Cargando resultados...</span>'  + '</div>'  + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
+        + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">⚽ Sync desde GitHub</button>'    + '<div id="github-sync-msg" style="font-size:13px;min-height:18px;margin-top:8px;"></div>'  + '<span id="sync-status-text">Cargando resultados...</span>'  + '</div>'  + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
 
   await renderAdminMatchesList();
 }
