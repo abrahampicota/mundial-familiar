@@ -128,6 +128,15 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .confirm-btn-cancel { flex: 1; padding: 9px; border: 1px solid #2a382a; border-radius: 8px; background: none; color: #7a9a7a; font-size: 14px; cursor: pointer; }
 .confirm-btn-ok { flex: 1; padding: 9px; border: none; border-radius: 8px; background: #742a2a; color: #fc8181; font-size: 14px; font-weight: 600; cursor: pointer; }
 
+/* Emoji Picker */
+.emoji-picker { position:relative; display:inline-block; }
+.emoji-grid { position:absolute; bottom:40px; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px; display:none; grid-template-columns:repeat(6,1fr); gap:4px; z-index:999; box-shadow:0 4px 20px rgba(0,0,0,0.4); width:220px; }
+.emoji-grid.open { display:grid; }
+.emoji-opt { font-size:20px; cursor:pointer; padding:4px; border-radius:6px; text-align:center; border:none; background:none; transition:background 0.1s; }
+.emoji-opt:hover { background:var(--surface2); }
+.emoji-toggle-btn { padding:8px 10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; font-size:16px; cursor:pointer; flex-shrink:0; }
+.emoji-toggle-btn:hover { border-color:var(--gold); }
+
 /* Comments & Reactions */
 .reactions-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
 .reaction-btn { display:flex; align-items:center; gap:3px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:var(--surface2); font-size:14px; cursor:pointer; transition:all 0.15s; }
@@ -1167,6 +1176,46 @@ function toggleComments(id) {
     }, 50);
   }
 }
+
+const EMOJI_LIST = [
+  '😀','😂','🤣','😍','🥹','😎','🤩','😤','😱','🤯',
+  '👏','🙌','🔥','💪','⚽','🥅','🏆','🎉','🎊','💥',
+  '❤️','💛','💙','🇵🇦','🇲🇽','🇺🇸','🇨🇦','🇧🇷','🇦🇷','🇫🇷',
+  '👑','🌟','⭐','🚀','😭','🤦','🙈','💀','🫶','🤝'
+];
+
+function getEmojiGrid(matchId) {
+  return EMOJI_LIST.map(e =>
+    '<button class="emoji-opt" data-mid="'+matchId+'" data-em="'+encodeURIComponent(e)+'" onclick="insertEmoji(this.dataset.mid, decodeURIComponent(this.dataset.em))">'+e+'</button>'
+  ).join('');
+}
+
+function toggleEmojiPicker(id) {
+  // Close all other pickers first
+  document.querySelectorAll('.emoji-grid.open').forEach(el => {
+    if (el.id !== id) el.classList.remove('open');
+  });
+  const picker = document.getElementById(id);
+  if (picker) picker.classList.toggle('open');
+}
+
+function insertEmoji(matchId, emoji) {
+  const input = document.getElementById('cinput-'+matchId);
+  if (!input) return;
+  const pos = input.selectionStart || input.value.length;
+  input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
+  input.focus();
+  input.setSelectionRange(pos + emoji.length, pos + emoji.length);
+  // Close picker
+  document.querySelectorAll('.emoji-grid.open').forEach(el => el.classList.remove('open'));
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.emoji-picker')) {
+    document.querySelectorAll('.emoji-grid.open').forEach(el => el.classList.remove('open'));
+  }
+});
 
 function handleReaction(btn) {
   const matchId = btn.dataset.mid;
