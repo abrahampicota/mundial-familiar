@@ -128,6 +128,25 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .confirm-btn-cancel { flex: 1; padding: 9px; border: 1px solid #2a382a; border-radius: 8px; background: none; color: #7a9a7a; font-size: 14px; cursor: pointer; }
 .confirm-btn-ok { flex: 1; padding: 9px; border: none; border-radius: 8px; background: #742a2a; color: #fc8181; font-size: 14px; font-weight: 600; cursor: pointer; }
 
+/* Comments & Reactions */
+.reactions-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.reaction-btn { display:flex; align-items:center; gap:3px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:var(--surface2); font-size:14px; cursor:pointer; transition:all 0.15s; }
+.reaction-btn:hover { transform:scale(1.1); border-color:var(--gold); }
+.reaction-btn.active { background:#2a2000; border-color:var(--gold); }
+.reaction-count { font-size:11px; color:var(--text-muted); font-weight:500; }
+.comments-list { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; margin-bottom:8px; }
+.comment-bubble { background:var(--surface2); border-radius:10px; padding:8px 10px; }
+.comment-author { font-size:11px; font-weight:600; color:var(--gold); margin-bottom:2px; }
+.comment-text { font-size:13px; color:var(--text); line-height:1.4; }
+.comment-time { font-size:10px; color:var(--text-muted); margin-top:2px; }
+.comment-input-row { display:flex; gap:6px; }
+.comment-input { flex:1; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; }
+.comment-input:focus { border-color:var(--gold); }
+.comment-send-btn { padding:8px 14px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.comments-section { border-top:1px solid var(--border); margin-top:10px; padding-top:10px; }
+.comments-toggle { font-size:11px; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:4px; margin-bottom:8px; background:none; border:none; padding:0; }
+.comments-toggle:hover { color:var(--text); }
+
 @media (max-width: 480px) {
   .logo { font-size: 1rem; letter-spacing: 0.5px; }
   .nav-btn { font-size: 0.75rem; padding: 7px 8px; letter-spacing: 0; }
@@ -265,7 +284,7 @@ const SUPABASE_KEY = 'sb_publishable_4U3skEL7RboqhnEn8wap2w_jT3C1lMP';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ADMIN_EMAIL = 'abrahampicota@gmail.com';
 
-let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [];
+let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [], allComments = [], allReactions = [];
 
 // ── PUNTAJE ───────────────────────────────────────────
 // 5 pts = marcador exacto, 3 pts = ganador correcto, 0 = fallo
@@ -510,6 +529,10 @@ async function loadMatches() {
   const ids = allMatches.map(m => m.id);
   const { data: preds } = await sb.from('predictions').select('*, profiles(name,nickname)').in('match_id', ids);
   allPredictions = preds || [];
+  const { data: comms } = await sb.from('comments').select('*, profiles(name,nickname)').in('match_id', ids).order('created_at', { ascending: true });
+  allComments = comms || [];
+  const { data: reacts } = await sb.from('reactions').select('*').in('match_id', ids);
+  allReactions = reacts || [];
   renderMatches();
 }
 
@@ -1078,7 +1101,117 @@ function matchCard(m) {
       +inputHtml
       +rankingSection
     +'</div>'
+    +buildCommentsSection(m.id)
   +'</div>';
+}
+
+function buildCommentsSection(matchId) {
+  const EMOJIS = ['🔥','😂','😱','👏','🎉','😤'];
+  const matchReactions = allReactions.filter(r => r.match_id === matchId);
+  const matchComments = allComments.filter(c => c.match_id === matchId);
+
+  // Count reactions per emoji
+  const reactionBtns = EMOJIS.map(e => {
+    const count = matchReactions.filter(r => r.emoji === e).length;
+    const mine = matchReactions.find(r => r.emoji === e && r.user_id === currentUser.id);
+    return '<button class="reaction-btn'+(mine?' active':'')+'" data-mid="'+matchId+'" data-emo="'+encodeURIComponent(e)+'" onclick="handleReaction(this)" title="'+e+'">'
+      +e+(count > 0 ? '<span class="reaction-count">'+count+'</span>' : '')
+    +'</button>';
+  }).join('');
+
+  const commentsHtml = matchComments.map(c => {
+    const nick = c.profiles?.nickname || c.profiles?.name || '?';
+    const time = new Date(c.created_at).toLocaleString('es', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const isMe = c.user_id === currentUser.id;
+    return '<div class="comment-bubble" style="'+(isMe?'border-left:2px solid var(--gold);':'border-left:2px solid var(--border);')+'">'
+      +'<div class="comment-author">'+nick+(isMe?' (tú)':'')+'</div>'
+      +'<div class="comment-text">'+escapeHtml(c.text)+'</div>'
+      +'<div class="comment-time">'+time+(isMe?' · <span data-cid="'+c.id+'" data-mid="'+matchId+'" onclick="deleteComment(this.dataset.cid,this.dataset.mid)" style="color:#fc8181;cursor:pointer;">Borrar</span>':'')+'</div>'
+    +'</div>';
+  }).join('');
+
+  const commentsId = 'comments-'+matchId;
+  const count = matchComments.length;
+
+  return '<div class="comments-section">'
+    +'<div class="reactions-bar">'+reactionBtns+'</div>'
+    +'<button class="comments-toggle" data-tid="'+commentsId+'" onclick="toggleComments(this.dataset.tid)" id="toggle-'+commentsId+'">'
+      +'💬 '+(count > 0 ? count+' comentario'+(count>1?'s':'') : 'Comentar')
+      +'<span id="arrow-'+commentsId+'">'+(count>0?' ▲':' ▼')+'</span>'
+    +'</button>'
+    +'<div id="'+commentsId+'" style="display:'+(count>0?'block':'none')+';">'
+      +(commentsHtml ? '<div class="comments-list">'+commentsHtml+'</div>' : '')
+      +'<div class="comment-input-row">'
+        +'<input class="comment-input" id="cinput-'+matchId+'" type="text" placeholder="Escribe algo..." maxlength="200" data-mid="'+matchId+'" onkeydown="if(event.key===\'Enter\')sendComment(this.dataset.mid)" />'
+        +'<button class="comment-send-btn" data-mid="'+matchId+'" onclick="sendComment(this.dataset.mid)">Enviar</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+}
+
+function escapeHtml(t) {
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleComments(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById('arrow-'+id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? ' ▼' : ' ▲';
+  if (!open) {
+    setTimeout(() => {
+      const input = el.querySelector('input');
+      if (input) input.focus();
+    }, 50);
+  }
+}
+
+function handleReaction(btn) {
+  const matchId = btn.dataset.mid;
+  const emoji = decodeURIComponent(btn.dataset.emo);
+  toggleReaction(matchId, emoji);
+}
+
+async function toggleReaction(matchIdStr, emoji) {
+  const matchId = parseInt(matchIdStr);
+  const existing = allReactions.find(r => r.match_id === matchId && r.user_id === currentUser.id && r.emoji === emoji);
+  if (existing) {
+    await sb.from('reactions').delete().eq('id', existing.id);
+    allReactions = allReactions.filter(r => r.id !== existing.id);
+  } else {
+    const { data } = await sb.from('reactions').insert({ match_id: matchId, user_id: currentUser.id, emoji }).select().single();
+    if (data) allReactions.push(data);
+  }
+  renderMatches();
+}
+
+async function sendComment(matchIdStr) {
+  const matchId = parseInt(matchIdStr);
+  const input = document.getElementById('cinput-'+matchId);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const { data, error } = await sb.from('comments').insert({
+    match_id: matchId, user_id: currentUser.id, text
+  }).select('*, profiles(name,nickname)').single();
+  if (!error && data) {
+    allComments.push(data);
+    renderMatches();
+    // Re-open comments section
+    const el = document.getElementById('comments-'+matchId);
+    if (el) el.style.display = 'block';
+  }
+}
+
+async function deleteComment(commentId, matchId) {
+  await sb.from('comments').delete().eq('id', commentId);
+  allComments = allComments.filter(c => c.id !== commentId);
+  renderMatches();
+  const el = document.getElementById('comments-'+matchId);
+  if (el) el.style.display = 'block';
 }
 
 async function savePred(matchId) {
