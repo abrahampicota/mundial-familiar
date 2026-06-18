@@ -970,16 +970,19 @@ function updateSyncStatus(finishedCount, totalCount, syncing) {
 }
 
 async function checkAndAutoSync() {
-  // Check if any match started more than 2 hours ago and still has no result
   const now = new Date();
+  // Only sync if there's at least one match that:
+  // 1. Started more than 2 hours ago
+  // 2. Does NOT have a final result yet (NS, 1H, 2H, HT - not FT/AET/PEN)
+  const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
   const needsSync = allMatches.some(m => {
-    if (m.status !== 'NS' && m.status !== null) return false;
+    if (FINAL_STATUSES.includes(m.status)) return false; // already has result
     const kickoff = new Date(m.date);
     const msSinceKickoff = now - kickoff;
-    return msSinceKickoff > 2 * 60 * 60 * 1000; // 2 hours after kickoff
+    return msSinceKickoff > 2 * 60 * 60 * 1000; // 2+ hours since kickoff
   });
 
-  if (!needsSync) return;
+  if (!needsSync) return; // nothing to update
 
   // Check if GitHub file changed
   try {
@@ -1680,6 +1683,9 @@ async function loadAdminMatches() {
         + '<button onclick="syncFromGitHub()" id="github-sync-btn" style="padding:8px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">⚽ Sync desde GitHub</button>'    + '<div id="github-sync-msg" style="font-size:13px;min-height:18px;margin-top:8px;"></div>'  + '<span id="sync-status-text">Cargando resultados...</span>'  + '</div>'  + '<div id="admin-matches-list"><div class="empty"><span class="spinner"></span> Cargando partidos...</div></div>';
 
   await renderAdminMatchesList();
+  // Update sync status after data is loaded
+  const finished = allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length;
+  updateSyncStatus(finished, allMatches.length, false);
 }
 
 async function renderAdminMatchesList() {
