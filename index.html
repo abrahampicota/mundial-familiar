@@ -129,8 +129,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .confirm-btn-ok { flex: 1; padding: 9px; border: none; border-radius: 8px; background: #742a2a; color: #fc8181; font-size: 14px; font-weight: 600; cursor: pointer; }
 
 /* Emoji Picker */
-.emoji-picker { position:relative; display:inline-block; }
-.emoji-grid { position:absolute; bottom:40px; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px; display:none; grid-template-columns:repeat(6,1fr); gap:4px; z-index:999; box-shadow:0 4px 20px rgba(0,0,0,0.4); width:220px; }
+.emoji-picker { position:relative; display:inline-block; flex-shrink:0; }
+.emoji-grid { position:absolute; bottom:44px; left:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px; display:none; grid-template-columns:repeat(6,1fr); gap:4px; z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.5); width:230px; }
 .emoji-grid.open { display:grid; }
 .emoji-opt { font-size:20px; cursor:pointer; padding:4px; border-radius:6px; text-align:center; border:none; background:none; transition:background 0.1s; }
 .emoji-opt:hover { background:var(--surface2); }
