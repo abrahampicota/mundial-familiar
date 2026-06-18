@@ -137,6 +137,17 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .emoji-toggle-btn { padding:8px 10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; font-size:16px; cursor:pointer; flex-shrink:0; }
 .emoji-toggle-btn:hover { border-color:var(--gold); }
 
+/* Result Banner */
+.result-banner { text-align:center; padding:6px 10px; border-radius:8px; margin-bottom:8px; font-size:13px; font-weight:500; }
+.result-banner.win { background:#0a1a00; border:1px solid #7BC829; color:#7BC829; }
+.result-banner.draw { background:#0a0a20; border:1px solid #2B4EAF; color:#9988bb; }
+
+/* Sync status bar */
+.sync-bar { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted); margin-bottom:10px; padding:6px 10px; background:var(--surface2); border-radius:8px; border:1px solid var(--border); }
+.sync-dot { width:8px; height:8px; border-radius:50%; background:var(--text-muted); flex-shrink:0; }
+.sync-dot.active { background:#7BC829; animation:pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
 /* Comments & Reactions */
 .reactions-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
 .reaction-btn { display:flex; align-items:center; gap:3px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:var(--surface2); font-size:14px; cursor:pointer; transition:all 0.15s; }
@@ -247,6 +258,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
         <div class="section-title" style="margin:0">Partidos</div>
         <button onclick="loadMatches()" style="font-size:12px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);cursor:pointer;">Actualizar</button>
+      </div>
+      <div class="sync-bar" id="sync-status-bar">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-status-text">Cargando resultados...</span>
       </div>
       <div class="legend">
         <span class="pts-badge pts-exact" title="Acertaste el marcador exacto en tiempo regular">+5 pts</span> Marcador exacto &nbsp;
@@ -404,6 +419,11 @@ async function initApp(user) {
     if (el) el.style.display = 'inline';
   }
   await loadMatches();
+  // Update sync status
+  const finished = allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length;
+  updateSyncStatus(finished, allMatches.length, false);
+  // Start auto-sync
+  startAutoSync();
 }
 
 // ── TABS ──────────────────────────────────────────────
@@ -928,6 +948,73 @@ async function loadStats() {
     }).join('');
 }
 
+// ── AUTO SYNC ─────────────────────────────────────────────
+let autoSyncInterval = null;
+let lastGithubSha = null;
+
+function updateSyncStatus(finishedCount, totalCount, syncing) {
+  const dot = document.getElementById('sync-dot');
+  const text = document.getElementById('sync-status-text');
+  if (!dot || !text) return;
+  if (syncing) {
+    dot.className = 'sync-dot active';
+    text.textContent = '⏳ Sincronizando resultados...';
+    return;
+  }
+  const pending = allMatches.filter(m => m.status === 'NS' && new Date(m.date) < new Date()).length;
+  if (finishedCount === 0) {
+    dot.className = 'sync-dot';
+    text.textContent = 'Sin resultados aún — el Mundial está por comenzar';
+  } else {
+    dot.className = 'sync-dot';
+    dot.style.background = finishedCount === totalCount ? '#7BC829' : '#FFE600';
+    text.textContent = '⚽ ' + finishedCount + '/' + totalCount + ' partidos con resultado'
+      + (pending > 0 ? ' · ' + pending + ' en espera de resultado' : ' · Todo actualizado ✓');
+  }
+}
+
+async function checkAndAutoSync() {
+  // Check if any match started more than 2 hours ago and still has no result
+  const now = new Date();
+  const needsSync = allMatches.some(m => {
+    if (m.status !== 'NS' && m.status !== null) return false;
+    const kickoff = new Date(m.date);
+    const msSinceKickoff = now - kickoff;
+    return msSinceKickoff > 2 * 60 * 60 * 1000; // 2 hours after kickoff
+  });
+
+  if (!needsSync) return;
+
+  // Check if GitHub file changed
+  try {
+    const res = await fetch('https://api.github.com/repos/openfootball/worldcup.json/commits?path=2026/worldcup.json&per_page=1');
+    if (!res.ok) return;
+    const commits = await res.json();
+    const latestSha = commits[0]?.sha;
+    if (!latestSha || latestSha === lastGithubSha) return; // No changes
+    lastGithubSha = latestSha;
+    // New commit found — sync!
+    updateSyncStatus(0, 0, true);
+    const result = await syncFromGitHub(true); // silent = true
+    if (result?.synced > 0) {
+      await loadMatches();
+      renderMatches();
+    }
+    updateSyncStatus(
+      allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length,
+      allMatches.length, false
+    );
+  } catch(e) {
+    console.warn('Auto-sync check failed:', e.message);
+  }
+}
+
+function startAutoSync() {
+  if (autoSyncInterval) clearInterval(autoSyncInterval);
+  autoSyncInterval = setInterval(checkAndAutoSync, 5 * 60 * 1000); // every 5 min
+  checkAndAutoSync(); // run immediately too
+}
+
 function togglePass(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -990,6 +1077,17 @@ function getMatchDeadline(m) {
 function getRoundStartDate(round) {
   const rd = ROUND_DATES[round];
   return rd ? rd.start : null;
+}
+
+function buildResultBanner(m) {
+  if (m.goals1 === null || m.goals2 === null) return '';
+  if (m.goals1 > m.goals2) {
+    return '<div class="result-banner win">🏆 ' + m.team1 + ' ganó ' + m.goals1 + '-' + m.goals2 + '</div>';
+  } else if (m.goals2 > m.goals1) {
+    return '<div class="result-banner win">🏆 ' + m.team2 + ' ganó ' + m.goals2 + '-' + m.goals1 + '</div>';
+  } else {
+    return '<div class="result-banner draw">🤝 Empate ' + m.goals1 + '-' + m.goals2 + '</div>';
+  }
 }
 
 function matchCard(m) {
@@ -1124,6 +1222,7 @@ function matchCard(m) {
       +'<span class="match-group">'+(m.group_name||'')+'</span>'
       +'<div style="display:flex;gap:8px;align-items:center;">'+badgeHtml+'<span class="match-date">'+dateStr+'</span></div>'
     +'</div>'
+    +(done ? buildResultBanner(m) : '')
     +'<div class="match-teams">'
       +'<div class="team-name team-left">'+m.team1+'</div>'
       +scoreHtml
@@ -1452,13 +1551,14 @@ function parseUtcFromStr(dateStr, timeStr) {
   return new Date(local.getTime() - offsetMs);
 }
 
-async function syncFromGitHub() {
+async function syncFromGitHub(silent = false) {
   const btn = document.getElementById('github-sync-btn');
   const msg = document.getElementById('github-sync-msg');
-  btn.textContent = '⏳ Sincronizando...';
-  btn.disabled = true;
-  msg.style.color = '#9988bb';
-  msg.textContent = 'Descargando datos desde GitHub...';
+  if (!silent) {
+    if (btn) { btn.textContent = '⏳ Sincronizando...'; btn.disabled = true; }
+    if (msg) { msg.style.color = '#9988bb'; msg.textContent = 'Descargando datos desde GitHub...'; }
+    updateSyncStatus(0, 0, true);
+  }
 
   try {
     const res = await fetch('https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json');
@@ -1499,17 +1599,22 @@ async function syncFromGitHub() {
       }
     }
 
-    msg.style.color = '#7BC829';
-    msg.textContent = '✓ ' + updated + ' partidos actualizados, ' + withResults + ' con resultado';
-    await loadMatches();
-    await renderAdminMatchesList();
+    if (!silent) {
+      if (msg) { msg.style.color = '#7BC829'; msg.textContent = '✓ ' + updated + ' partidos actualizados, ' + withResults + ' con resultado'; }
+      await loadMatches();
+      await renderAdminMatchesList();
+    }
+    updateSyncStatus(
+      allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length,
+      allMatches.length, false
+    );
+    return { synced: updated, withResults };
   } catch(e) {
-    msg.style.color = '#fc8181';
-    msg.textContent = '⚠ Error: ' + e.message;
+    if (!silent && msg) { msg.style.color = '#fc8181'; msg.textContent = '⚠ Error: ' + e.message; }
+    return { synced: 0 };
   }
 
-  btn.textContent = '⚽ Sync desde GitHub';
-  btn.disabled = false;
+  if (!silent && btn) { btn.textContent = '⚽ Sync desde GitHub'; btn.disabled = false; }
 }
 
 async function manualSync() {
