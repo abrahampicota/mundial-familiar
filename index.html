@@ -1151,6 +1151,10 @@ function buildCommentsSection(matchId) {
     +'<div id="'+commentsId+'" style="display:'+(count>0?'block':'none')+';">'
       +(commentsHtml ? '<div class="comments-list">'+commentsHtml+'</div>' : '')
       +'<div class="comment-input-row">'
+        +'<div class="emoji-picker">'
+        +'<button class="emoji-toggle-btn" data-tid="epicker-'+matchId+'" onclick="toggleEmojiPicker(this.dataset.tid)">&#x1F60A;</button>'
+        +'<div class="emoji-grid" id="epicker-'+matchId+'">'+getEmojiGrid(matchId)+'</div>'
+        +'</div>'
         +'<input class="comment-input" id="cinput-'+matchId+'" type="text" placeholder="Escribe algo..." maxlength="200" data-mid="'+matchId+'" onkeydown="if(event.key===\'Enter\')sendComment(this.dataset.mid)" />'
         +'<button class="comment-send-btn" data-mid="'+matchId+'" onclick="sendComment(this.dataset.mid)">Enviar</button>'
       +'</div>'
