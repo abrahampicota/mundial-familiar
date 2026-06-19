@@ -1078,6 +1078,19 @@ function getRoundStartDate(round) {
   return rd ? rd.start : null;
 }
 
+const FLAGS = {"México": "🇲🇽", "Sudáfrica": "🇿🇦", "Corea del Sur": "🇰🇷", "Rep. Checa": "🇨🇿", "Canadá": "🇨🇦", "Bosnia y Herzegovina": "🇧🇦", "Qatar": "🇶🇦", "Suiza": "🇨🇭", "Brasil": "🇧🇷", "Marruecos": "🇲🇦", "Haití": "🇭🇹", "Escocia": "🏴\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f", "Australia": "🇦🇺", "Turquía": "🇹🇷", "Alemania": "🇩🇪", "Curazao": "🇨🇼", "Países Bajos": "🇳🇱", "Japón": "🇯🇵", "Costa de Marfil": "🇨🇮", "Ecuador": "🇪🇨", "Suecia": "🇸🇪", "Túnez": "🇹🇳", "España": "🇪🇸", "Cabo Verde": "🇨🇻", "Arabia Saudita": "🇸🇦", "Uruguay": "🇺🇾", "Irán": "🇮🇷", "Nueva Zelanda": "🇳🇿", "Bélgica": "🇧🇪", "Egipto": "🇪🇬", "Francia": "🇫🇷", "Senegal": "🇸🇳", "Irak": "🇮🇶", "Noruega": "🇳🇴", "Argentina": "🇦🇷", "Argelia": "🇩🇿", "Austria": "🇦🇹", "Jordania": "🇯🇴", "Portugal": "🇵🇹", "RD del Congo": "🇨🇩", "Uzbekistán": "🇺🇿", "Colombia": "🇨🇴", "Inglaterra": "🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f", "Croacia": "🇭🇷", "Ghana": "🇬🇭", "Panamá": "🇵🇦", "Estados Unidos": "🇺🇸", "Paraguay": "🇵🇾"};
+
+function getFlag(team) {
+  if (!team) return '';
+  // Try exact match first
+  if (FLAGS[team]) return FLAGS[team] + ' ';
+  // Try partial match
+  for (const [name, flag] of Object.entries(FLAGS)) {
+    if (team.includes(name) || name.includes(team)) return flag + ' ';
+  }
+  return '';
+}
+
 function buildResultBanner(m) {
   if (m.goals1 === null || m.goals2 === null) return '';
   if (m.goals1 > m.goals2) {
@@ -1131,12 +1144,12 @@ function matchCard(m) {
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-align:center;text-transform:uppercase;letter-spacing:1px;">¿Cuál será el marcador?</div>
         <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:8px;">
           <div style="text-align:center;">
-            <div class="score-team-label">${m.team1}</div>
+            <div class="score-team-label">${getFlag(m.team1)}${m.team1}</div>
             <input class="score-input" id="g1-${m.id}" type="number" min="0" max="20" placeholder="?" ${!canEdit ? 'disabled' : ''} />
           </div>
           <div class="score-sep" style="margin-bottom:8px;">-</div>
           <div style="text-align:center;">
-            <div class="score-team-label">${m.team2}</div>
+            <div class="score-team-label">${getFlag(m.team2)}${m.team2}</div>
             <input class="score-input" id="g2-${m.id}" type="number" min="0" max="20" placeholder="?" ${!canEdit ? 'disabled' : ''} />
           </div>
         </div>
@@ -1223,9 +1236,9 @@ function matchCard(m) {
     +'</div>'
     +(done ? buildResultBanner(m) : '')
     +'<div class="match-teams">'
-      +'<div class="team-name team-left">'+m.team1+'</div>'
+      +'<div class="team-name team-left">'+getFlag(m.team1)+m.team1+'</div>'
       +scoreHtml
-      +'<div class="team-name">'+m.team2+'</div>'
+      +'<div class="team-name">'+getFlag(m.team2)+m.team2+'</div>'
     +'</div>'
     +'<div class="pred-section">'
       +inputHtml
