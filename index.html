@@ -329,12 +329,14 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
     </div>
     <div id="tab-admin" class="section">
       <div class="section-title">Admin</div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;">
-        <button onclick="adminShowTab('usuarios')" id="admin-tab-usuarios" style="padding:7px 16px;border-radius:8px;border:1px solid #F5C518;background:#2a2000;color:#F5C518;font-size:13px;font-weight:600;cursor:pointer;">👥 Usuarios</button>
-        <button onclick="adminShowTab('partidos')" id="admin-tab-partidos" style="padding:7px 16px;border-radius:8px;border:1px solid #2a382a;background:none;color:#7a9a7a;font-size:13px;cursor:pointer;">⚽ Partidos</button>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
+        <button onclick="adminShowTab('usuarios')" id="admin-tab-usuarios" style="padding:7px 16px;border-radius:8px;border:1px solid var(--gold);background:#2a2000;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;">👥 Usuarios</button>
+        <button onclick="adminShowTab('partidos')" id="admin-tab-partidos" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-muted);font-size:13px;cursor:pointer;">⚽ Partidos</button>
+        <button onclick="adminShowTab('grupos')" id="admin-tab-grupos" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-muted);font-size:13px;cursor:pointer;">👥 Grupos</button>
       </div>
       <div id="admin-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
       <div id="admin-matches-container" style="display:none"></div>
+      <div id="admin-grupos-container" style="display:none"></div>
     </div>
   </main>
 </div>
@@ -1236,6 +1238,167 @@ function renderKnockoutStandings(matches, container) {
   container.innerHTML = html || '<div class="empty">Sin resultados aún</div>';
 }
 
+
+// ── ADMIN GRUPOS ──────────────────────────────────────────
+async function loadAdminGrupos() {
+  const container = document.getElementById('admin-grupos-container');
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando grupos...</div>';
+
+  const { data: groups } = await sb.from('groups')
+    .select('*, group_members(count), profiles(name,nickname)')
+    .order('created_at', { ascending: false });
+
+  const myGroups = (groups || []).filter(g => g.owner_id === currentUser.id);
+  const otherGroups = (groups || []).filter(g => g.owner_id !== currentUser.id);
+
+  container.innerHTML =
+    // Create group form
+    '<div class="card" style="margin-bottom:1rem;">'
+      +'<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:10px;">➕ CREAR NUEVO GRUPO</div>'
+      +'<input id="grp-name" type="text" placeholder="Nombre del grupo (ej. Familia, Trabajo...)" maxlength="40" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-bottom:8px;box-sizing:border-box;" />'
+      +'<input id="grp-desc" type="text" placeholder="Descripción opcional" maxlength="80" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-bottom:10px;box-sizing:border-box;" />'
+      +'<button onclick="createGroup()" style="padding:9px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">Crear grupo</button>'
+      +'<div id="grp-msg" style="font-size:13px;margin-top:8px;min-height:18px;"></div>'
+    +'</div>'
+
+    // My groups
+    +'<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:10px;">MIS GRUPOS</div>'
+    +(myGroups.length === 0
+      ? '<div class="empty" style="margin-bottom:1rem;">No has creado ningún grupo aún</div>'
+      : myGroups.map(g => renderGroupCard(g, true)).join('')
+    )
+
+    // Join group
+    +'<div class="card" style="margin-bottom:1rem;">'
+      +'<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:10px;">🔗 UNIRSE A UN GRUPO</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +'<input id="grp-code" type="text" placeholder="Código de invitación" maxlength="6" style="flex:1;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;text-transform:uppercase;" />'
+        +'<button onclick="joinGroup()" style="padding:9px 16px;background:#2B4EAF;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">Unirse</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+}
+
+async function createGroup() {
+  const name = document.getElementById('grp-name').value.trim();
+  const desc = document.getElementById('grp-desc').value.trim();
+  const msg = document.getElementById('grp-msg');
+  if (!name) { msg.style.color='#fc8181'; msg.textContent='Ingresa un nombre para el grupo'; return; }
+
+  const { data, error } = await sb.from('groups').insert({
+    name, description: desc || null, owner_id: currentUser.id
+  }).select().single();
+
+  if (error) { msg.style.color='#fc8181'; msg.textContent='Error: '+error.message; return; }
+
+  // Auto-join as member
+  await sb.from('group_members').insert({ group_id: data.id, user_id: currentUser.id });
+
+  msg.style.color='#7BC829';
+  msg.textContent='✓ Grupo "'+name+'" creado. Código: '+data.invite_code;
+  document.getElementById('grp-name').value = '';
+  document.getElementById('grp-desc').value = '';
+  setTimeout(() => loadAdminGrupos(), 1000);
+}
+
+async function joinGroup() {
+  const code = document.getElementById('grp-code').value.trim().toUpperCase();
+  const msg = document.getElementById('join-msg');
+  if (!code) { msg.style.color='#fc8181'; msg.textContent='Ingresa un código de invitación'; return; }
+
+  const { data: group } = await sb.from('groups').select('*').eq('invite_code', code).single();
+  if (!group) { msg.style.color='#fc8181'; msg.textContent='Código inválido — verifica e intenta de nuevo'; return; }
+
+  const { error } = await sb.from('group_members').insert({ group_id: group.id, user_id: currentUser.id });
+  if (error?.code === '23505') { msg.style.color='#FFE600'; msg.textContent='Ya eres miembro de "'+group.name+'"'; return; }
+  if (error) { msg.style.color='#fc8181'; msg.textContent='Error: '+error.message; return; }
+
+  msg.style.color='#7BC829';
+  msg.textContent='✓ Te uniste a "'+group.name+'" exitosamente';
+  document.getElementById('grp-code').value = '';
+  setTimeout(() => loadAdminGrupos(), 1000);
+}
+
+async function manageMembers(groupId) {
+  const panel = document.getElementById('members-' + groupId);
+  if (!panel) return;
+
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando...</div>';
+
+  // Load all profiles and current members
+  const [{ data: allProfiles }, { data: members }] = await Promise.all([
+    sb.from('profiles').select('id,name,nickname').order('name'),
+    sb.from('group_members').select('user_id').eq('group_id', groupId)
+  ]);
+
+  const memberIds = new Set((members || []).map(m => m.user_id));
+
+  const rows = (allProfiles || []).map(p => {
+    const isMember = memberIds.has(p.id);
+    const nick = p.nickname || p.name || '?';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">'
+      +'<div style="width:30px;height:30px;border-radius:50%;background:'+(isMember?'#7BC829':'var(--border)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;">'+nick[0].toUpperCase()+'</div>'
+      +'<div style="flex:1;font-size:13px;">'+nick+'</div>'
+      +(isMember
+        ? '<span style="font-size:11px;color:#7BC829;margin-right:6px;">✓ Miembro</span>'
+          +'<button data-gid="'+groupId+'" data-uid="'+p.id+'" onclick="removeMemberBtn(this)" style="padding:3px 8px;border:1px solid #8B1A2A;border-radius:5px;background:none;color:#fc8181;font-size:11px;cursor:pointer;">Quitar</button>'
+        : '<button data-gid="'+groupId+'" data-uid="'+p.id+'" onclick="addMemberBtn(this)" style="padding:3px 8px;border:1px solid #2B4EAF;border-radius:5px;background:none;color:#9988bb;font-size:11px;cursor:pointer;">+ Agregar</button>'
+      )
+    +'</div>';
+  }).join('');
+
+  panel.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Gestionar miembros</div>' + rows;
+}
+
+function addMemberBtn(btn) { addMemberToGroup(btn.dataset.gid, btn.dataset.uid); }
+function removeMemberBtn(btn) { removeMemberFromGroup(btn.dataset.gid, btn.dataset.uid); }
+
+async function addMemberToGroup(groupId, userId) {
+  const { error } = await sb.from('group_members').insert({ group_id: groupId, user_id: userId });
+  if (!error) { showToast('Usuario agregado al grupo ✓', 'ok'); manageMembers(groupId); manageMembers(groupId); }
+  else showToast('Error: ' + error.message, 'error');
+}
+
+async function removeMemberFromGroup(groupId, userId) {
+  await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', userId);
+  showToast('Usuario eliminado del grupo', 'ok');
+  manageMembers(groupId);
+  manageMembers(groupId);
+}
+
+function editGroupBtn(btn) { editGroup(btn.dataset.gid, btn.dataset.gname, btn.dataset.gdesc); }
+function deleteGroupBtn(btn) { deleteGroup(btn.dataset.gid, btn.dataset.gname); }
+function leaveGroupBtn(btn) { leaveGroup(btn.dataset.gid, btn.dataset.gname); }
+
+async function editGroup(id, currentName, currentDesc) {
+  const newName = prompt('Nuevo nombre del grupo:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+  const { error } = await sb.from('groups').update({ name: newName.trim() }).eq('id', id);
+  if (!error) { showToast('Grupo actualizado ✓', 'ok'); loadAdminGrupos(); }
+}
+
+async function deleteGroup(id, name) {
+  const ok = await confirmDialog('¿Eliminar grupo "'+name+'"?', 'Se eliminarán todos los miembros del grupo. Esta acción no se puede deshacer.');
+  if (!ok) return;
+  await sb.from('groups').delete().eq('id', id);
+  showToast('Grupo eliminado', 'ok');
+  loadAdminGrupos();
+}
+
+async function leaveGroup(id, name) {
+  const ok = await confirmDialog('¿Salir del grupo "'+name+'"?', 'Ya no podrás ver el ranking de este grupo.');
+  if (!ok) return;
+  await sb.from('group_members').delete().eq('group_id', id).eq('user_id', currentUser.id);
+  showToast('Saliste del grupo', 'ok');
+  loadAdminGrupos();
+}
+
 function togglePass(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -1746,19 +1909,21 @@ function nickOf(p) {
 }
 
 function adminShowTab(tab) {
-  const tabs = ['usuarios', 'partidos'];
+  const tabs = ['usuarios', 'partidos', 'grupos'];
   tabs.forEach(t => {
     const btn = document.getElementById('admin-tab-' + t);
     if (btn) {
-      btn.style.border = t === tab ? '1px solid #F5C518' : '1px solid #2a382a';
+      btn.style.border = t === tab ? '1px solid var(--gold)' : '1px solid var(--border)';
       btn.style.background = t === tab ? '#2a2000' : 'none';
-      btn.style.color = t === tab ? '#F5C518' : '#7a9a7a';
+      btn.style.color = t === tab ? 'var(--gold)' : 'var(--text-muted)';
     }
   });
   document.getElementById('admin-container').style.display = tab === 'usuarios' ? 'block' : 'none';
   document.getElementById('admin-matches-container').style.display = tab === 'partidos' ? 'block' : 'none';
+  document.getElementById('admin-grupos-container').style.display = tab === 'grupos' ? 'block' : 'none';
   if (tab === 'partidos') loadAdminMatches();
   if (tab === 'usuarios') loadAdmin();
+  if (tab === 'grupos') loadAdminGrupos();
 }
 
 const TEAM_MAP = {
