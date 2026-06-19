@@ -614,9 +614,18 @@ async function loadMatches() {
   const ids = allMatches.map(m => m.id);
   const { data: preds } = await sb.from('predictions').select('*, profiles(name,nickname)').in('match_id', ids);
   allPredictions = preds || [];
-  const { data: comms } = await sb.from('comments').select('*, profiles(name,nickname)').in('match_id', ids).order('created_at', { ascending: true });
+  // Load comments filtered by active group
+  let commsQuery = sb.from('comments').select('*, profiles(name,nickname)').in('match_id', ids).order('created_at', { ascending: true });
+  if (activeGroup) commsQuery = commsQuery.eq('group_id', activeGroup.id);
+  else commsQuery = commsQuery.is('group_id', null);
+  const { data: comms } = await commsQuery;
   allComments = comms || [];
-  const { data: reacts } = await sb.from('reactions').select('*').in('match_id', ids);
+
+  // Load reactions filtered by active group
+  let reactsQuery = sb.from('reactions').select('*').in('match_id', ids);
+  if (activeGroup) reactsQuery = reactsQuery.eq('group_id', activeGroup.id);
+  else reactsQuery = reactsQuery.is('group_id', null);
+  const { data: reacts } = await reactsQuery;
   allReactions = reacts || [];
   renderMatches();
 }
@@ -1743,7 +1752,12 @@ function buildCommentsSection(matchId) {
   const commentsId = 'comments-'+matchId;
   const count = matchComments.length;
 
+  const groupLabel = activeGroup
+    ? '<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">💬 Comentarios del grupo <span style="color:var(--gold);">'+activeGroup.name+'</span></div>'
+    : '';
+
   return '<div class="comments-section">'
+    +groupLabel
     +'<div class="reactions-bar">'+reactionBtns+'</div>'
     +'<button class="comments-toggle" data-tid="'+commentsId+'" onclick="toggleComments(this.dataset.tid)" id="toggle-'+commentsId+'">'
       +'💬 '+(count > 0 ? count+' comentario'+(count>1?'s':'') : 'Comentar')
@@ -1849,7 +1863,8 @@ async function sendComment(matchIdStr) {
   if (!text) return;
   input.value = '';
   const { data, error } = await sb.from('comments').insert({
-    match_id: matchId, user_id: currentUser.id, text
+    match_id: matchId, user_id: currentUser.id, text,
+    group_id: activeGroup ? activeGroup.id : null
   }).select('*, profiles(name,nickname)').single();
   if (!error && data) {
     allComments.push(data);
@@ -1898,9 +1913,30 @@ async function savePred(matchId) {
 // ── LEADERBOARD ───────────────────────────────────────
 async function loadLeaderboard() {
   document.getElementById('lb-container').innerHTML = '<div class="empty"><span class="spinner"></span> Calculando...</div>';
-  const { data: profiles } = await sb.from('profiles').select('*');
+
+  // Get members of active group, or all profiles if no group selected
+  let profiles;
+  if (activeGroup) {
+    const { data: members } = await sb.from('group_members')
+      .select('profiles(id,name,nickname,email)')
+      .eq('group_id', activeGroup.id);
+    profiles = (members || []).map(m => m.profiles).filter(Boolean);
+  } else {
+    const { data } = await sb.from('profiles').select('*');
+    profiles = data || [];
+  }
+
   const { data: preds } = await sb.from('predictions').select('*, matches(status,goals1,goals2)');
-  if (!profiles) return;
+  if (!profiles.length) {
+    document.getElementById('lb-container').innerHTML = '<div class="empty">No hay miembros en este grupo aún</div>';
+    return;
+  }
+
+  // Group label
+  const groupLabel = activeGroup
+    ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:6px;">👥 <span style="color:var(--gold);font-weight:500;">'+activeGroup.name+'</span> · '+profiles.length+' miembro'+(profiles.length!==1?'s':'')+'</div>'
+    : '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">🌐 Ranking global · '+profiles.length+' jugadores</div>';
+
   const scores = profiles.map(p => {
     const myPreds = (preds||[]).filter(x => x.user_id === p.id);
     let pts = 0, exact = 0, outcome = 0, played = 0;
@@ -1915,7 +1951,7 @@ async function loadLeaderboard() {
     return { ...p, pts, exact, outcome, played };
   }).sort((a,b) => b.pts - a.pts);
   const medals = ['🥇','🥈','🥉'];
-  document.getElementById('lb-container').innerHTML = `
+  document.getElementById('lb-container').innerHTML = groupLabel + `
     <div style="display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px;font-size:11px;color:var(--text-muted);padding:0 14px 8px;">
       <span>#</span><span></span><span>Jugador</span><span style="text-align:center">⭐ Exactos</span><span style="text-align:right">Pts</span>
     </div>
