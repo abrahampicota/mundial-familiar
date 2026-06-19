@@ -1244,9 +1244,14 @@ async function loadAdminGrupos() {
   const container = document.getElementById('admin-grupos-container');
   container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando grupos...</div>';
 
-  const { data: groups } = await sb.from('groups')
-    .select('*, group_members(count), profiles(name,nickname)')
+  const { data: groups, error: grpErr } = await sb.from('groups')
+    .select('*, group_members(count)')
     .order('created_at', { ascending: false });
+
+  if (grpErr) {
+    container.innerHTML = '<div class="empty">Error cargando grupos: ' + grpErr.message + '</div>';
+    return;
+  }
 
   const myGroups = (groups || []).filter(g => g.owner_id === currentUser.id);
   const otherGroups = (groups || []).filter(g => g.owner_id !== currentUser.id);
