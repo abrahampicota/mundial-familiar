@@ -154,11 +154,14 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .standings-pos.top2 { color:var(--lime); font-weight:700; }
 .standings-pos.top3 { color:#2B4EAF; font-weight:600; }
 .standings-pts { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:var(--gold); }
-.form-circle { width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; margin:0 1px; }
-.form-W { background:#7BC829; color:#fff; }
-.form-D { background:#2B4EAF; color:#fff; }
-.form-L { background:#8B1A2A; color:#fff; }
-.form-empty { background:var(--border); }
+.form-circle { width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; margin:0 1px; border:2px solid transparent; }
+.form-W { background:#7BC829; color:#fff; border-color:#7BC829; }
+.form-W::after { content:'✓'; }
+.form-D { background:#555; color:#fff; border-color:#555; }
+.form-D::after { content:'—'; font-size:9px; }
+.form-L { background:#E8231A; color:#fff; border-color:#E8231A; }
+.form-L::after { content:'✕'; }
+.form-empty { background:transparent; border-color:var(--border); }
 
 /* Result Banner */
 .result-banner { text-align:center; padding:6px 10px; border-radius:8px; margin-bottom:8px; font-size:13px; font-weight:500; }
@@ -1118,12 +1121,16 @@ function calcStandings(matches, teams) {
 }
 
 function formCircles(form) {
-  const last5 = form.slice(-5);
-  while (last5.length < 5) last5.unshift(null);
-  return last5.map(r => r
-    ? '<span class="form-circle form-'+r+'">'+r+'</span>'
-    : '<span class="form-circle form-empty"></span>'
-  ).join('');
+  // Played games left to right, empty slots on the right
+  const played = form.slice(-5); // last 5 played
+  const empty = Math.max(0, 5 - played.length);
+  const circles = played.map(r =>
+    '<span class="form-circle form-'+r+'" title="'+(r==='W'?'Victoria':r==='D'?'Empate':'Derrota')+'"></span>'
+  );
+  for (let i = 0; i < empty; i++) {
+    circles.push('<span class="form-circle form-empty" title="No jugado"></span>');
+  }
+  return circles.join('');
 }
 
 function renderGroupStandings(matches, container) {
@@ -1174,9 +1181,19 @@ function renderGroupStandings(matches, container) {
   }).join('');
 
   // Legend
-  const legend = '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-top:6px;">'
-    +'<span><span style="display:inline-block;width:10px;height:10px;background:rgba(123,200,41,0.3);border-radius:2px;margin-right:4px;"></span>Clasificado a D16</span>'
-    +'<span><span style="display:inline-block;width:10px;height:10px;background:rgba(43,78,175,0.3);border-radius:2px;margin-right:4px;"></span>Posible 3° clasificado</span>'
+  const legend = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">'
+    +'<div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;width:100%;">CLASIFICACIÓN</div>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);">'
+      +'<span style="width:10px;height:10px;background:rgba(123,200,41,0.4);border-left:3px solid #7BC829;display:inline-block;"></span>Clasificado a D16'
+    +'</span>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);">'
+      +'<span style="width:10px;height:10px;background:rgba(43,78,175,0.4);border-left:3px solid #2B4EAF;display:inline-block;"></span>Posible 3° clasificado'
+    +'</span>'
+    +'<div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-top:6px;width:100%;">ÚLTIMOS 5 PARTIDOS</div>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);"><span class="form-circle form-W"></span>Victoria</span>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);"><span class="form-circle form-D"></span>Empate</span>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);"><span class="form-circle form-L"></span>Derrota</span>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);"><span class="form-circle form-empty"></span>No jugado</span>'
     +'</div>';
 
   container.innerHTML = html + legend || '<div class="empty">Sin resultados aún</div>';
