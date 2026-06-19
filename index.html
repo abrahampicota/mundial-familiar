@@ -137,6 +137,29 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .emoji-toggle-btn { padding:8px 10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; font-size:16px; cursor:pointer; flex-shrink:0; }
 .emoji-toggle-btn:hover { border-color:var(--gold); }
 
+/* Standings Table */
+.standings-group { margin-bottom:1.5rem; }
+.standings-group-title { font-family:'Bebas Neue',sans-serif; font-size:1rem; color:var(--gold); letter-spacing:1px; margin-bottom:6px; padding:4px 0; border-bottom:1px solid var(--border); }
+.standings-table { width:100%; border-collapse:collapse; font-size:13px; }
+.standings-table th { color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding:4px 6px; text-align:center; font-weight:500; }
+.standings-table th:first-child { text-align:left; }
+.standings-table td { padding:7px 6px; text-align:center; border-bottom:1px solid var(--border); }
+.standings-table td:first-child { text-align:left; }
+.standings-table tr:last-child td { border-bottom:none; }
+.standings-table tr.qualified { background:rgba(123,200,41,0.05); }
+.standings-table tr.knockout { background:rgba(43,78,175,0.05); }
+.standings-table tr.eliminated { opacity:0.6; }
+.standings-team { display:flex; align-items:center; gap:6px; font-weight:500; }
+.standings-pos { width:18px; color:var(--text-muted); font-size:12px; }
+.standings-pos.top2 { color:var(--lime); font-weight:700; }
+.standings-pos.top3 { color:#2B4EAF; font-weight:600; }
+.standings-pts { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:var(--gold); }
+.form-circle { width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; margin:0 1px; }
+.form-W { background:#7BC829; color:#fff; }
+.form-D { background:#2B4EAF; color:#fff; }
+.form-L { background:#8B1A2A; color:#fff; }
+.form-empty { background:var(--border); }
+
 /* Result Banner */
 .result-banner { text-align:center; padding:6px 10px; border-radius:8px; margin-bottom:8px; font-size:13px; font-weight:500; }
 .result-banner.win { background:#0a1a00; border:1px solid #7BC829; color:#7BC829; }
@@ -247,7 +270,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
   </header>
   <nav>
     <button class="nav-btn active" onclick="showTab('partidos',this)">Partidos</button>
-    <button class="nav-btn" onclick="showTab('tabla',this)">Tabla</button>
+    <button class="nav-btn" onclick="showTab('tabla',this)">🏅 Ranking</button>
+    <button class="nav-btn" onclick="showTab('posiciones',this)">📋 Posiciones</button>
     <button class="nav-btn" onclick="showTab('campeon',this)">🏆 Campeón</button>
     <button class="nav-btn" onclick="showTab('stats',this)">📊 Estadísticas</button>
     <button class="nav-btn" onclick="showTab('perfil',this)">Mi perfil</button>
@@ -271,8 +295,16 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
       <div id="matches-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
     <div id="tab-tabla" class="section">
-      <div class="section-title">Tabla de posiciones</div>
+      <div class="section-title">🏅 Ranking de Pronósticos</div>
       <div id="lb-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
+    </div>
+    <div id="tab-posiciones" class="section">
+      <div class="section-title">📋 Tabla de Posiciones</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;">
+        <button onclick="switchPosTab('grupos')" id="pos-tab-grupos" style="padding:6px 16px;border-radius:8px;border:1px solid var(--gold);background:#2a2000;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;">Fase de Grupos</button>
+        <button onclick="switchPosTab('eliminatorias')" id="pos-tab-eliminatorias" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text-muted);font-size:13px;cursor:pointer;">Eliminatorias</button>
+      </div>
+      <div id="pos-container"><div class="empty"><span class="spinner"></span> Cargando...</div></div>
     </div>
     <div id="tab-perfil" class="section">
       <div class="section-title">Mi perfil</div>
@@ -432,6 +464,7 @@ function showTab(name, btn) {
   if (name === 'perfil') renderProfile();
   if (name === 'admin') loadAdmin();
   if (name === 'stats') loadStats();
+  if (name === 'posiciones') loadPosiciones('grupos');
   if (name === 'campeon') loadCampeon();
 }
 
@@ -1012,6 +1045,175 @@ function startAutoSync() {
   if (autoSyncInterval) clearInterval(autoSyncInterval);
   autoSyncInterval = setInterval(checkAndAutoSync, 5 * 60 * 1000); // every 5 min
   checkAndAutoSync(); // run immediately too
+}
+
+
+// ── TABLA DE POSICIONES ────────────────────────────────────
+const GROUP_NAMES = ['Grupo A','Grupo B','Grupo C','Grupo D','Grupo E','Grupo F',
+                     'Grupo G','Grupo H','Grupo I','Grupo J','Grupo K','Grupo L'];
+
+let currentPosTab = 'grupos';
+
+function switchPosTab(tab) {
+  currentPosTab = tab;
+  ['grupos','eliminatorias'].forEach(t => {
+    const btn = document.getElementById('pos-tab-' + t);
+    if (btn) {
+      btn.style.border = t === tab ? '1px solid var(--gold)' : '1px solid var(--border)';
+      btn.style.background = t === tab ? '#2a2000' : 'none';
+      btn.style.color = t === tab ? 'var(--gold)' : 'var(--text-muted)';
+    }
+  });
+  loadPosiciones(tab);
+}
+
+async function loadPosiciones(tab) {
+  const container = document.getElementById('pos-container');
+  if (!container) return;
+  container.innerHTML = '<div class="empty"><span class="spinner"></span> Calculando...</div>';
+
+  // Use allMatches already loaded
+  const matches = allMatches.filter(m => {
+    if (tab === 'grupos') return m.round === 'Grupos' || !m.round;
+    return m.round && m.round !== 'Grupos';
+  });
+
+  if (tab === 'grupos') {
+    renderGroupStandings(matches, container);
+  } else {
+    renderKnockoutStandings(matches, container);
+  }
+}
+
+function calcStandings(matches, teams) {
+  const standings = {};
+  teams.forEach(t => { standings[t] = { mp:0, w:0, d:0, l:0, gf:0, ga:0, pts:0, form:[] }; });
+
+  matches.forEach(m => {
+    if (!['FT','AET','PEN'].includes(m.status)) return;
+    if (m.goals1 === null || m.goals2 === null) return;
+    const t1 = m.team1, t2 = m.team2;
+    if (!standings[t1]) standings[t1] = { mp:0, w:0, d:0, l:0, gf:0, ga:0, pts:0, form:[] };
+    if (!standings[t2]) standings[t2] = { mp:0, w:0, d:0, l:0, gf:0, ga:0, pts:0, form:[] };
+
+    standings[t1].mp++; standings[t2].mp++;
+    standings[t1].gf += m.goals1; standings[t1].ga += m.goals2;
+    standings[t2].gf += m.goals2; standings[t2].ga += m.goals1;
+
+    if (m.goals1 > m.goals2) {
+      standings[t1].w++; standings[t1].pts += 3; standings[t1].form.push('W');
+      standings[t2].l++; standings[t2].form.push('L');
+    } else if (m.goals2 > m.goals1) {
+      standings[t2].w++; standings[t2].pts += 3; standings[t2].form.push('W');
+      standings[t1].l++; standings[t1].form.push('L');
+    } else {
+      standings[t1].d++; standings[t1].pts++; standings[t1].form.push('D');
+      standings[t2].d++; standings[t2].pts++; standings[t2].form.push('D');
+    }
+  });
+
+  return Object.entries(standings).map(([team, s]) => ({
+    team, ...s, gd: s.gf - s.ga
+  })).sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
+}
+
+function formCircles(form) {
+  const last5 = form.slice(-5);
+  while (last5.length < 5) last5.unshift(null);
+  return last5.map(r => r
+    ? '<span class="form-circle form-'+r+'">'+r+'</span>'
+    : '<span class="form-circle form-empty"></span>'
+  ).join('');
+}
+
+function renderGroupStandings(matches, container) {
+  const html = GROUP_NAMES.map(group => {
+    const groupMatches = matches.filter(m => m.group_name === group);
+    if (!groupMatches.length) return '';
+
+    const teams = [...new Set(groupMatches.flatMap(m => [m.team1, m.team2]))];
+    const standings = calcStandings(groupMatches, teams);
+    const totalMatchdays = 3;
+
+    const rows = standings.map((s, i) => {
+      const posClass = i < 2 ? 'top2' : i === 2 ? 'top3' : '';
+      const rowClass = i < 2 ? 'qualified' : i === 2 ? 'knockout' : 'eliminated';
+      return '<tr class="'+rowClass+'">'
+        +'<td><span class="standings-pos '+posClass+'">'+(i+1)+'</span></td>'
+        +'<td><div class="standings-team">'+getFlag(s.team)+'<span>'+s.team+'</span></div></td>'
+        +'<td>'+s.mp+'</td>'
+        +'<td>'+s.w+'</td>'
+        +'<td>'+s.d+'</td>'
+        +'<td>'+s.l+'</td>'
+        +'<td>'+s.gf+'</td>'
+        +'<td>'+s.ga+'</td>'
+        +'<td>'+(s.gd > 0 ? '+':'')+s.gd+'</td>'
+        +'<td><span class="standings-pts">'+s.pts+'</span></td>'
+        +'<td>'+formCircles(s.form)+'</td>'
+      +'</tr>';
+    }).join('');
+
+    return '<div class="standings-group">'
+      +'<div class="standings-group-title">'+group+'</div>'
+      +'<table class="standings-table">'
+        +'<thead><tr>'
+          +'<th>#</th><th style="text-align:left;">Equipo</th>'
+          +'<th title="Partidos jugados">PJ</th>'
+          +'<th title="Victorias">G</th>'
+          +'<th title="Empates">E</th>'
+          +'<th title="Derrotas">P</th>'
+          +'<th title="Goles a favor">GF</th>'
+          +'<th title="Goles en contra">GC</th>'
+          +'<th title="Diferencia de goles">DG</th>'
+          +'<th title="Puntos">Pts</th>'
+          +'<th>Forma</th>'
+        +'</tr></thead>'
+        +'<tbody>'+rows+'</tbody>'
+      +'</table>'
+    +'</div>';
+  }).join('');
+
+  // Legend
+  const legend = '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-top:6px;">'
+    +'<span><span style="display:inline-block;width:10px;height:10px;background:rgba(123,200,41,0.3);border-radius:2px;margin-right:4px;"></span>Clasificado a D16</span>'
+    +'<span><span style="display:inline-block;width:10px;height:10px;background:rgba(43,78,175,0.3);border-radius:2px;margin-right:4px;"></span>Posible 3° clasificado</span>'
+    +'</div>';
+
+  container.innerHTML = html + legend || '<div class="empty">Sin resultados aún</div>';
+}
+
+function renderKnockoutStandings(matches, container) {
+  if (!matches.length) {
+    container.innerHTML = '<div class="empty">Las eliminatorias aún no han comenzado 🔒</div>';
+    return;
+  }
+  const rounds = ['Dieciseisavos','Octavos','Cuartos','Semifinal','Tercer Puesto','Final'];
+  const html = rounds.map(round => {
+    const roundMatches = matches.filter(m => m.round === round);
+    if (!roundMatches.length) return '';
+    const rows = roundMatches.map(m => {
+      const done = ['FT','AET','PEN'].includes(m.status);
+      const winner = done ? (m.goals1 > m.goals2 ? m.team1 : m.goals2 > m.goals1 ? m.team2 : null) : null;
+      return '<tr>'
+        +'<td><div class="standings-team">'+getFlag(m.team1)
+          +'<span style="'+(winner===m.team1?'color:var(--gold);font-weight:600;':'')+'">'+m.team1+'</span></div></td>'
+        +'<td style="text-align:center;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:var(--gold);">'
+          +(done ? m.goals1+' - '+m.goals2 : 'vs')
+          +(m.status==='AET'?' <span style="font-size:9px;color:var(--text-muted)">ET</span>':'')
+          +(m.status==='PEN'?' <span style="font-size:9px;color:var(--text-muted)">PEN</span>':'')
+        +'</td>'
+        +'<td><div class="standings-team" style="justify-content:flex-end;">'+getFlag(m.team2)
+          +'<span style="'+(winner===m.team2?'color:var(--gold);font-weight:600;':'')+'">'+m.team2+'</span></div></td>'
+      +'</tr>';
+    }).join('');
+
+    return '<div class="standings-group">'
+      +'<div class="standings-group-title">'+round+'</div>'
+      +'<table class="standings-table"><tbody>'+rows+'</tbody></table>'
+    +'</div>';
+  }).join('');
+
+  container.innerHTML = html || '<div class="empty">Sin resultados aún</div>';
 }
 
 function togglePass(inputId, btn) {
