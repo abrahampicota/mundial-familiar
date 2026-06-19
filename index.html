@@ -1324,6 +1324,31 @@ async function joinGroup() {
   setTimeout(() => loadAdminGrupos(), 1000);
 }
 
+function renderGroupCard(g, isOwner) {
+  const memberCount = g.group_members?.[0]?.count || 0;
+  return '<div class="card" style="margin-bottom:8px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:600;font-size:15px;color:var(--text);">'+g.name+'</div>'
+        +(g.description ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+g.description+'</div>' : '')
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+memberCount+' miembro'+(memberCount!==1?'s':'')+(isOwner?' · Tú eres el admin':'')+'</div>'
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
+        +'<div style="background:#0a1a30;border:1px solid #2B4EAF;border-radius:8px;padding:4px 10px;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#FFE600;letter-spacing:2px;" title="Código de invitación">'+g.invite_code+'</div>'
+        +(isOwner
+          ? '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">'
+              +'<button data-gid="'+g.id+'" onclick="manageMembers(this.dataset.gid)" style="padding:4px 10px;border:1px solid #2B4EAF;border-radius:6px;background:none;color:#9988bb;font-size:11px;cursor:pointer;">👥 Miembros</button>'
+              +'<button data-gid="'+g.id+'" data-gname="'+g.name.replace(/"/g,'&quot;')+'" data-gdesc="'+(g.description||'').replace(/"/g,'&quot;')+'" onclick="editGroupBtn(this)" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);font-size:11px;cursor:pointer;">✏️ Editar</button>'
+              +'<button data-gid="'+g.id+'" data-gname="'+g.name.replace(/"/g,'&quot;')+'" onclick="deleteGroupBtn(this)" style="padding:4px 10px;border:1px solid #8B1A2A;border-radius:6px;background:none;color:#fc8181;font-size:11px;cursor:pointer;">🗑️ Eliminar</button>'
+            +'</div>'
+          : '<button data-gid="'+g.id+'" data-gname="'+g.name.replace(/"/g,'&quot;')+'" onclick="leaveGroupBtn(this)" style="padding:4px 10px;border:1px solid #8B1A2A;border-radius:6px;background:none;color:#fc8181;font-size:11px;cursor:pointer;">Salir</button>'
+        )
+      +'</div>'
+    +'</div>'
+    +'<div id="members-'+g.id+'" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;"></div>'
+  +'</div>';
+}
+
 async function manageMembers(groupId) {
   const panel = document.getElementById('members-' + groupId);
   if (!panel) return;
