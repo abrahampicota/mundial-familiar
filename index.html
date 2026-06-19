@@ -97,6 +97,10 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .btn-logout { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.group-selector { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:4px 10px; cursor:pointer; font-size:12px; color:var(--text-muted); transition:border-color 0.2s; position:relative; }
+.group-selector:hover { border-color:var(--gold); }
+.group-selector select { background:none; border:none; color:var(--text); font-size:12px; cursor:pointer; outline:none; max-width:100px; }
+.group-badge { background:var(--accent); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
 .legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 11px; color: var(--text-muted); align-items: center; }
 #app { display: none; }
 #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
@@ -268,7 +272,13 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 <div id="app">
   <header>
     <div class="logo"><img src="trophy.png" alt="FIFA World Cup Trophy" style="height:28px;width:auto;vertical-align:middle;margin-right:4px;">FIFA <span>2026 · MEX CAN USA</span></div>
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;">
+      <div class="group-selector" id="group-selector" style="display:none;">
+        <span>👥</span>
+        <select id="group-select" onchange="switchGroup(this.value)" title="Cambiar grupo">
+        </select>
+        <span class="group-badge" id="group-count">0</span>
+      </div>
       <strong id="header-name" style="font-size:12px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;"></strong>
       <button class="btn-logout" onclick="logout()">Salir</button>
     </div>
@@ -347,7 +357,7 @@ const SUPABASE_KEY = 'sb_publishable_4U3skEL7RboqhnEn8wap2w_jT3C1lMP';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ADMIN_EMAIL = 'abrahampicota@gmail.com';
 
-let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [], allComments = [], allReactions = [];
+let currentUser = null, currentProfile = null, allMatches = [], allPredictions = [], allComments = [], allReactions = [], userGroups = [], activeGroup = null;
 
 // ── PUNTAJE ───────────────────────────────────────────
 // 5 pts = marcador exacto, 3 pts = ganador correcto, 0 = fallo
@@ -443,6 +453,7 @@ async function initApp(user) {
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   currentProfile = profile;
   document.getElementById('header-name').textContent = profile?.nickname || profile?.name || user.email;
+  await loadUserGroups();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   if (user.email === ADMIN_EMAIL) {
@@ -1427,6 +1438,46 @@ async function leaveGroup(id, name) {
   await sb.from('group_members').delete().eq('group_id', id).eq('user_id', currentUser.id);
   showToast('Saliste del grupo', 'ok');
   loadAdminGrupos();
+}
+
+// ── GROUP SELECTOR ────────────────────────────────────────
+async function loadUserGroups() {
+  // Get groups the user belongs to
+  const { data: memberships } = await sb.from('group_members')
+    .select('group_id, groups(id, name, invite_code)')
+    .eq('user_id', currentUser.id);
+
+  userGroups = (memberships || []).map(m => m.groups).filter(Boolean);
+
+  const selector = document.getElementById('group-selector');
+  const select = document.getElementById('group-select');
+  const badge = document.getElementById('group-count');
+
+  if (!userGroups.length) {
+    selector.style.display = 'none';
+    return;
+  }
+
+  // Show selector
+  selector.style.display = 'flex';
+  badge.textContent = userGroups.length;
+
+  // Build options
+  select.innerHTML = '<option value="">🌐 Todos</option>'
+    + userGroups.map(g => '<option value="'+g.id+'">'+g.name+'</option>').join('');
+
+  // Default to first group
+  if (userGroups.length === 1) {
+    select.value = userGroups[0].id;
+    activeGroup = userGroups[0];
+  }
+}
+
+function switchGroup(groupId) {
+  activeGroup = userGroups.find(g => g.id === groupId) || null;
+  // Refresh current tab
+  const activeBtn = document.querySelector('.nav-btn.active');
+  if (activeBtn) activeBtn.click();
 }
 
 function togglePass(inputId, btn) {
