@@ -146,9 +146,11 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .standings-table td { padding:7px 6px; text-align:center; border-bottom:1px solid var(--border); }
 .standings-table td:first-child { text-align:left; }
 .standings-table tr:last-child td { border-bottom:none; }
-.standings-table tr.qualified { background:rgba(123,200,41,0.05); }
-.standings-table tr.knockout { background:rgba(43,78,175,0.05); }
-.standings-table tr.eliminated { opacity:0.6; }
+.standings-table tr.qualified { background:rgba(123,200,41,0.04); }
+.standings-table tr.knockout { background:rgba(43,78,175,0.04); }
+.standings-table tr.eliminated { opacity:0.65; }
+.standings-table tr { border-left:3px solid transparent; transition:background 0.15s; }
+.standings-table tr:hover { background:rgba(255,255,255,0.03) !important; }
 .standings-team { display:flex; align-items:center; gap:6px; font-weight:500; }
 .standings-pos { width:18px; color:var(--text-muted); font-size:12px; }
 .standings-pos.top2 { color:var(--lime); font-weight:700; }
@@ -1145,7 +1147,8 @@ function renderGroupStandings(matches, container) {
     const rows = standings.map((s, i) => {
       const posClass = i < 2 ? 'top2' : i === 2 ? 'top3' : '';
       const rowClass = i < 2 ? 'qualified' : i === 2 ? 'knockout' : 'eliminated';
-      return '<tr class="'+rowClass+'">'
+      const borderColor = i < 2 ? '#7BC829' : i === 2 ? '#2B4EAF' : 'transparent';
+      return '<tr class="'+rowClass+'" style="border-left:3px solid '+borderColor+';">'
         +'<td><span class="standings-pos '+posClass+'">'+(i+1)+'</span></td>'
         +'<td><div class="standings-team">'+getFlag(s.team)+'<span>'+s.team+'</span></div></td>'
         +'<td>'+s.mp+'</td>'
