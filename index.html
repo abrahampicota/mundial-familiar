@@ -1181,18 +1181,35 @@ function formCircles(form) {
 }
 
 function renderGroupStandings(matches, container) {
+  const isMobile = window.innerWidth < 500;
+
   const html = GROUP_NAMES.map(group => {
     const groupMatches = matches.filter(m => m.group_name === group);
     if (!groupMatches.length) return '';
 
     const teams = [...new Set(groupMatches.flatMap(m => [m.team1, m.team2]))];
     const standings = calcStandings(groupMatches, teams);
-    const totalMatchdays = 3;
 
     const rows = standings.map((s, i) => {
       const posClass = i < 2 ? 'top2' : i === 2 ? 'top3' : '';
       const rowClass = i < 2 ? 'qualified' : i === 2 ? 'knockout' : 'eliminated';
       const borderColor = i < 2 ? '#7BC829' : i === 2 ? '#2B4EAF' : 'transparent';
+
+      if (isMobile) {
+        // Mobile: compact single row, no GF/GC, smaller form circles
+        return '<tr class="'+rowClass+'" style="border-left:3px solid '+borderColor+';">'
+          +'<td style="padding:6px 4px;"><span class="standings-pos '+posClass+'">'+(i+1)+'</span></td>'
+          +'<td style="padding:6px 3px;max-width:90px;"><div style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:500;">'+getFlag(s.team)+'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px;">'+s.team+'</span></div></td>'
+          +'<td style="padding:6px 3px;font-size:11px;">'+s.mp+'</td>'
+          +'<td style="padding:6px 3px;font-size:11px;">'+s.w+'</td>'
+          +'<td style="padding:6px 3px;font-size:11px;">'+s.d+'</td>'
+          +'<td style="padding:6px 3px;font-size:11px;">'+s.l+'</td>'
+          +'<td style="padding:6px 3px;font-size:11px;">'+(s.gd>0?'+':'')+s.gd+'</td>'
+          +'<td style="padding:6px 3px;"><span style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:var(--gold);">'+s.pts+'</span></td>'
+          +'<td style="padding:6px 3px;"><div style="display:flex;gap:1px;flex-wrap:nowrap;">'+formCircles(s.form)+'</div></td>'
+        +'</tr>';
+      }
+
       return '<tr class="'+rowClass+'" style="border-left:3px solid '+borderColor+';">'
         +'<td><span class="standings-pos '+posClass+'">'+(i+1)+'</span></td>'
         +'<td class="team-cell"><div class="standings-team">'+getFlag(s.team)+'<span>'+s.team+'</span></div></td>'
@@ -1200,29 +1217,22 @@ function renderGroupStandings(matches, container) {
         +'<td>'+s.w+'</td>'
         +'<td>'+s.d+'</td>'
         +'<td>'+s.l+'</td>'
-        +'<td class="col-hide-mobile">'+s.gf+'</td>'
-        +'<td class="col-hide-mobile">'+s.ga+'</td>'
+        +'<td>'+s.gf+'</td>'
+        +'<td>'+s.ga+'</td>'
         +'<td>'+(s.gd > 0 ? '+':'')+s.gd+'</td>'
         +'<td><span class="standings-pts">'+s.pts+'</span></td>'
         +'<td><div class="form-circles">'+formCircles(s.form)+'</div></td>'
       +'</tr>';
     }).join('');
 
+    const mobileHeaders = isMobile
+      ? '<tr><th>#</th><th style="text-align:left;">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th><th>Forma</th></tr>'
+      : '<tr><th>#</th><th style="text-align:left;">Equipo</th><th title="Partidos jugados">PJ</th><th title="Victorias">G</th><th title="Empates">E</th><th title="Derrotas">P</th><th title="Goles a favor">GF</th><th title="Goles en contra">GC</th><th title="Diferencia de goles">DG</th><th title="Puntos">Pts</th><th>Forma</th></tr>';
+
     return '<div class="standings-group">'
       +'<div class="standings-group-title">'+group+'</div>'
       +'<table class="standings-table">'
-        +'<thead><tr>'
-          +'<th>#</th><th style="text-align:left;">Equipo</th>'
-          +'<th title="Partidos jugados">PJ</th>'
-          +'<th title="Victorias">G</th>'
-          +'<th title="Empates">E</th>'
-          +'<th title="Derrotas">P</th>'
-          +'<th class="col-hide-mobile" title="Goles a favor">GF</th>'
-          +'<th class="col-hide-mobile" title="Goles en contra">GC</th>'
-          +'<th title="Diferencia de goles">DG</th>'
-          +'<th title="Puntos">Pts</th>'
-          +'<th>Forma</th>'
-        +'</tr></thead>'
+        +'<thead>'+mobileHeaders+'</thead>'
         +'<tbody>'+rows+'</tbody>'
       +'</table>'
     +'</div>';
