@@ -1512,18 +1512,21 @@ let groupMemberIds = null; // null = show all
 
 async function switchGroup(groupId) {
   activeGroup = userGroups.find(g => g.id === groupId) || null;
-  // Load member IDs for active group
+
+  // Load member IDs for active group FIRST before refreshing
   if (activeGroup) {
     const { data: members } = await sb.from('group_members')
       .select('user_id')
       .eq('group_id', activeGroup.id);
     groupMemberIds = new Set((members || []).map(m => m.user_id));
+    console.log('[Group] Switched to:', activeGroup.name, '| Members:', [...groupMemberIds]);
   } else {
-    groupMemberIds = null; // show all
+    groupMemberIds = null;
+    console.log('[Group] Showing all groups');
   }
-  // Refresh current tab
-  const activeBtn = document.querySelector('.nav-btn.active');
-  if (activeBtn) activeBtn.click();
+
+  // Reload matches with new group context (comments/reactions filter by group)
+  await loadMatches();
 }
 
 function togglePass(inputId, btn) {
