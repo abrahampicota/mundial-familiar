@@ -1362,6 +1362,7 @@ async function joinGroup() {
   msg.style.color='#7BC829';
   msg.textContent='✓ Te uniste a "'+group.name+'" exitosamente';
   document.getElementById('grp-code').value = '';
+  await loadUserGroups(); // refresh header selector
   setTimeout(() => loadAdminGrupos(), 1000);
 }
 
@@ -1432,14 +1433,19 @@ function removeMemberBtn(btn) { removeMemberFromGroup(btn.dataset.gid, btn.datas
 
 async function addMemberToGroup(groupId, userId) {
   const { error } = await sb.from('group_members').insert({ group_id: groupId, user_id: userId });
-  if (!error) { showToast('Usuario agregado al grupo ✓', 'ok'); manageMembers(groupId); manageMembers(groupId); }
-  else showToast('Error: ' + error.message, 'error');
+  if (!error) {
+    showToast('Usuario agregado al grupo ✓', 'ok');
+    if (userId === currentUser.id) await loadUserGroups(); // refresh selector if self
+    manageMembers(groupId);
+  } else {
+    showToast('Error: ' + error.message, 'error');
+  }
 }
 
 async function removeMemberFromGroup(groupId, userId) {
   await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', userId);
   showToast('Usuario eliminado del grupo', 'ok');
-  manageMembers(groupId);
+  if (userId === currentUser.id) await loadUserGroups(); // refresh selector if self removed
   manageMembers(groupId);
 }
 
@@ -1467,6 +1473,7 @@ async function leaveGroup(id, name) {
   if (!ok) return;
   await sb.from('group_members').delete().eq('group_id', id).eq('user_id', currentUser.id);
   showToast('Saliste del grupo', 'ok');
+  await loadUserGroups(); // refresh header selector
   loadAdminGrupos();
 }
 
@@ -1484,7 +1491,10 @@ async function loadUserGroups() {
   const badge = document.getElementById('group-count');
 
   if (!userGroups.length) {
+    // No groups — show selector hidden, reset active group
     selector.style.display = 'none';
+    activeGroup = null;
+    groupMemberIds = null;
     return;
   }
 
@@ -1492,15 +1502,21 @@ async function loadUserGroups() {
   selector.style.display = 'flex';
   badge.textContent = userGroups.length;
 
-  // Build options
+  // Build options - preserve current selection if still valid
   select.innerHTML = '<option value="">🌐 Todos</option>'
     + userGroups.map(g => '<option value="'+g.id+'">'+g.name+'</option>').join('');
 
-  // Default to first group
-  if (userGroups.length === 1) {
-    select.value = userGroups[0].id;
+  // Keep active group if still in list, otherwise default to first
+  const stillValid = activeGroup && userGroups.find(g => g.id === activeGroup.id);
+  if (!stillValid) {
     activeGroup = userGroups[0];
-    // Load member IDs
+    select.value = activeGroup.id;
+  } else {
+    select.value = activeGroup.id;
+  }
+
+  // Load member IDs for active group
+  if (activeGroup) {
     const { data: members } = await sb.from('group_members')
       .select('user_id')
       .eq('group_id', activeGroup.id);
