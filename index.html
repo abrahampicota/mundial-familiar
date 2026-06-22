@@ -1031,40 +1031,47 @@ function updateSyncStatus(finishedCount, totalCount, syncing) {
 
 async function checkAndAutoSync() {
   const now = new Date();
-  // Only sync if there's at least one match that:
-  // 1. Started more than 2 hours ago
-  // 2. Does NOT have a final result yet (NS, 1H, 2H, HT - not FT/AET/PEN)
   const FINAL_STATUSES = ['FT', 'AET', 'PEN'];
+
+  // Only sync if there's a match that started 2+ hours ago without final result
   const needsSync = allMatches.some(m => {
-    if (FINAL_STATUSES.includes(m.status)) return false; // already has result
+    if (FINAL_STATUSES.includes(m.status)) return false;
     const kickoff = new Date(m.date);
-    const msSinceKickoff = now - kickoff;
-    return msSinceKickoff > 2 * 60 * 60 * 1000; // 2+ hours since kickoff
+    return (now - kickoff) > 2 * 60 * 60 * 1000;
   });
 
-  if (!needsSync) return; // nothing to update
+  if (!needsSync) return;
 
-  // Check if GitHub file changed
   try {
-    const res = await fetch('https://api.github.com/repos/openfootball/worldcup.json/commits?path=2026/worldcup.json&per_page=1');
-    if (!res.ok) return;
-    const commits = await res.json();
-    const latestSha = commits[0]?.sha;
-    if (!latestSha || latestSha === lastGithubSha) return; // No changes
-    lastGithubSha = latestSha;
-    // New commit found — sync!
-    updateSyncStatus(0, 0, true);
-    const result = await syncFromGitHub(true); // silent = true
+    // Check GitHub SHA to avoid unnecessary syncs
+    const shaRes = await fetch('https://api.github.com/repos/openfootball/worldcup.json/git/refs/heads/master');
+    if (shaRes.ok) {
+      const shaData = await shaRes.json();
+      const latestSha = shaData?.object?.sha;
+      if (latestSha && latestSha === lastGithubSha) return; // no new commits
+      lastGithubSha = latestSha;
+    }
+    // Sync silently
+    const result = await syncFromGitHub(true);
     if (result?.synced > 0) {
       await loadMatches();
       renderMatches();
+      updateSyncStatus(
+        allMatches.filter(m => FINAL_STATUSES.includes(m.status)).length,
+        allMatches.length, false
+      );
     }
-    updateSyncStatus(
-      allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length,
-      allMatches.length, false
-    );
   } catch(e) {
-    console.warn('Auto-sync check failed:', e.message);
+    // Silent fail — try direct sync without SHA check
+    try {
+      const result = await syncFromGitHub(true);
+      if (result?.synced > 0) {
+        await loadMatches();
+        renderMatches();
+      }
+    } catch(e2) {
+      console.warn('Auto-sync failed:', e2.message);
+    }
   }
 }
 
@@ -2071,19 +2078,44 @@ function parseUtcFromStr(dateStr, timeStr) {
 async function syncFromGitHub(silent = false) {
   const btn = document.getElementById('github-sync-btn');
   const msg = document.getElementById('github-sync-msg');
+
+  const setMsg = (text, color) => {
+    if (!silent && msg) { msg.style.color = color || '#9988bb'; msg.textContent = text; }
+    console.log('[Sync]', text);
+  };
+
   if (!silent) {
     if (btn) { btn.textContent = '⏳ Sincronizando...'; btn.disabled = true; }
-    if (msg) { msg.style.color = '#9988bb'; msg.textContent = 'Descargando datos desde GitHub...'; }
+    setMsg('📡 Conectando con GitHub...', '#9988bb');
     updateSyncStatus(0, 0, true);
   }
 
   try {
-    const res = await fetch('https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json');
-    if (!res.ok) throw new Error('No se pudo descargar el archivo');
-    const data = await res.json();
-    const matches = data.matches || [];
+    // Step 1: Download from GitHub
+    setMsg('📥 Descargando worldcup.json desde GitHub...', '#9988bb');
+    let res;
+    try {
+      res = await fetch('https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json');
+    } catch(e) {
+      throw new Error('Sin conexión a internet o GitHub bloqueado. Verifica tu red.');
+    }
+    if (!res.ok) throw new Error('GitHub respondió con error ' + res.status + '. Intenta de nuevo en unos minutos.');
 
-    let updated = 0, withResults = 0;
+    // Step 2: Parse JSON
+    let data;
+    try {
+      data = await res.json();
+    } catch(e) {
+      throw new Error('El archivo de GitHub tiene formato inválido. Puede estar en mantenimiento.');
+    }
+
+    const matches = data.matches || [];
+    if (!matches.length) throw new Error('El repositorio no tiene partidos. Puede que aún no estén cargados.');
+
+    setMsg('⚙️ Procesando ' + matches.length + ' partidos...', '#9988bb');
+
+    // Step 3: Update matches in Supabase
+    let updated = 0, withResults = 0, dbErrors = 0;
     for (const m of matches) {
       const team1 = TEAM_MAP[m.team1] || m.team1;
       const team2 = TEAM_MAP[m.team2] || m.team2;
@@ -2099,25 +2131,45 @@ async function syncFromGitHub(silent = false) {
         updateData.goals2 = ft[1];
         updateData.status = 'FT';
         withResults++;
+
+        // Show toast for newly finished matches
+        const local = allMatches.find(lm => lm.team1 === team1 && lm.team2 === team2);
+        if (local && local.status === 'NS') {
+          const winner = ft[0] > ft[1] ? team1 : ft[1] > ft[0] ? team2 : null;
+          const toastMsg = winner
+            ? '🏆 ' + winner + ' ganó'
+            : '🤝 ' + team1 + ' y ' + team2 + ' empataron';
+          setTimeout(() => showToast(toastMsg, 'ok'), (updated + 1) * 800);
+        }
       }
 
-      // Find match in local state and update DB
-      const local = allMatches.find(lm =>
-        lm.team1 === team1 && lm.team2 === team2
-      );
+      const local = allMatches.find(lm => lm.team1 === team1 && lm.team2 === team2);
       if (!local) continue;
 
-      await sb.from('matches').update(updateData).eq('id', local.id);
-      Object.assign(local, updateData);
-      updated++;
+      const { error: dbError } = await sb.from('matches').update(updateData).eq('id', local.id);
+      if (dbError) {
+        dbErrors++;
+        console.warn('DB error for', team1, 'vs', team2, ':', dbError.message);
+      } else {
+        Object.assign(local, updateData);
+        updated++;
+      }
 
-      if (updated % 10 === 0) {
-        msg.textContent = '⏳ Actualizando... ' + updated + '/' + matches.length;
+      if (!silent && updated % 10 === 0 && msg) {
+        msg.textContent = '⚙️ Actualizando... ' + updated + '/' + matches.length;
       }
     }
 
+    // Step 4: Show result
+    if (dbErrors > 0) {
+      setMsg('⚠️ ' + updated + ' actualizados, ' + dbErrors + ' con error de BD. Verifica permisos en Supabase.', '#FFE600');
+    } else if (withResults > 0) {
+      setMsg('✓ ' + updated + ' partidos procesados · ' + withResults + ' con resultado final', '#7BC829');
+    } else {
+      setMsg('✓ Fechas actualizadas · Sin resultados nuevos aún', '#7BC829');
+    }
+
     if (!silent) {
-      if (msg) { msg.style.color = '#7BC829'; msg.textContent = '✓ ' + updated + ' partidos actualizados, ' + withResults + ' con resultado'; }
       await loadMatches();
       await renderAdminMatchesList();
     }
@@ -2125,10 +2177,19 @@ async function syncFromGitHub(silent = false) {
       allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length,
       allMatches.length, false
     );
+    if (!silent && btn) { btn.textContent = '⚽ Sync desde GitHub'; btn.disabled = false; }
     return { synced: updated, withResults };
+
   } catch(e) {
-    if (!silent && msg) { msg.style.color = '#fc8181'; msg.textContent = '⚠ Error: ' + e.message; }
-    return { synced: 0 };
+    const errorMsg = '❌ ' + e.message;
+    setMsg(errorMsg, '#fc8181');
+    showToast(errorMsg, 'error');
+    if (!silent && btn) { btn.textContent = '⚽ Sync desde GitHub'; btn.disabled = false; }
+    updateSyncStatus(
+      allMatches.filter(m => ['FT','AET','PEN'].includes(m.status)).length,
+      allMatches.length, false
+    );
+    return { synced: 0, error: e.message };
   }
 
   if (!silent && btn) { btn.textContent = '⚽ Sync desde GitHub'; btn.disabled = false; }
