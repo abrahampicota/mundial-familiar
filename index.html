@@ -1195,16 +1195,16 @@ function renderGroupStandings(matches, container) {
       const borderColor = i < 2 ? '#7BC829' : i === 2 ? '#2B4EAF' : 'transparent';
       return '<tr class="'+rowClass+'" style="border-left:3px solid '+borderColor+';">'
         +'<td><span class="standings-pos '+posClass+'">'+(i+1)+'</span></td>'
-        +'<td><div class="standings-team">'+getFlag(s.team)+'<span>'+s.team+'</span></div></td>'
+        +'<td class="team-cell"><div class="standings-team">'+getFlag(s.team)+'<span>'+s.team+'</span></div></td>'
         +'<td>'+s.mp+'</td>'
         +'<td>'+s.w+'</td>'
         +'<td>'+s.d+'</td>'
         +'<td>'+s.l+'</td>'
-        +'<td>'+s.gf+'</td>'
-        +'<td>'+s.ga+'</td>'
+        +'<td class="col-hide-mobile">'+s.gf+'</td>'
+        +'<td class="col-hide-mobile">'+s.ga+'</td>'
         +'<td>'+(s.gd > 0 ? '+':'')+s.gd+'</td>'
         +'<td><span class="standings-pts">'+s.pts+'</span></td>'
-        +'<td>'+formCircles(s.form)+'</td>'
+        +'<td><div class="form-circles">'+formCircles(s.form)+'</div></td>'
       +'</tr>';
     }).join('');
 
@@ -1217,8 +1217,8 @@ function renderGroupStandings(matches, container) {
           +'<th title="Victorias">G</th>'
           +'<th title="Empates">E</th>'
           +'<th title="Derrotas">P</th>'
-          +'<th title="Goles a favor">GF</th>'
-          +'<th title="Goles en contra">GC</th>'
+          +'<th class="col-hide-mobile" title="Goles a favor">GF</th>'
+          +'<th class="col-hide-mobile" title="Goles en contra">GC</th>'
           +'<th title="Diferencia de goles">DG</th>'
           +'<th title="Puntos">Pts</th>'
           +'<th>Forma</th>'
