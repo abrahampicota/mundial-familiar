@@ -99,7 +99,8 @@ main { max-width: 700px; margin: 0 auto; padding: 1rem 0.75rem; }
 .btn-logout { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .group-selector { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:4px 10px; cursor:pointer; font-size:12px; color:var(--text-muted); transition:border-color 0.2s; position:relative; }
 .group-selector:hover { border-color:var(--gold); }
-.group-selector select { background:none; border:none; color:var(--text); font-size:12px; cursor:pointer; outline:none; max-width:100px; }
+.group-selector select { background:var(--surface); border:none; color:var(--text); font-size:12px; cursor:pointer; outline:none; max-width:120px; color-scheme:dark; }
+.group-selector select option { background:var(--surface); color:var(--text); padding:6px; }
 .group-badge { background:var(--accent); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
 .legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 11px; color: var(--text-muted); align-items: center; }
 #app { display: none; }
