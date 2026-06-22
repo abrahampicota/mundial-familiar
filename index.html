@@ -773,8 +773,13 @@ async function loadCampeon() {
   const container = document.getElementById('campeon-container');
   container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando...</div>';
 
-  const { data: picks } = await sb.from('champion_picks').select('*, profiles(name,nickname)');
-  const myPick = (picks||[]).find(p => p.user_id === currentUser.id);
+  let picksQuery = sb.from('champion_picks').select('*, profiles(name,nickname)');
+  const { data: picks } = await picksQuery;
+  // Filter by group members if active
+  const filteredPicks = activeGroup && groupMemberIds
+    ? (picks || []).filter(p => groupMemberIds.has(p.user_id))
+    : (picks || []);
+  const myPick = filteredPicks.find(p => p.user_id === currentUser.id);
   const deadline = new Date('2026-07-19T22:00:00Z'); // Final: 19 jul 5pm Panama
   const canPick = new Date() < deadline;
 
@@ -825,14 +830,14 @@ async function loadCampeon() {
 
   // Family picks
   let picksHtml = '';
-  if ((picks||[]).length > 0) {
+  if (filteredPicks.length > 0) {
     // Count votes per team
     const votes = {};
-    (picks||[]).forEach(p => { votes[p.team] = (votes[p.team]||0) + 1; });
+    filteredPicks.forEach(p => { votes[p.team] = (votes[p.team]||0) + 1; });
     const maxVotes = Math.max(...Object.values(votes));
 
     picksHtml = '<div style="font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#7a9a7a;margin-bottom:10px;letter-spacing:1px;">PREDICCIONES DE LA FAMILIA</div>'
-      + (picks||[]).map(p => {
+      + filteredPicks.map(p => {
         const isMe = p.user_id === currentUser.id;
         const nick = p.profiles?.nickname || p.profiles?.name || '?';
         return '<div class="lb-item' + (isMe?' me':'') + '" style="margin-bottom:8px;">'
@@ -870,9 +875,18 @@ async function loadStats() {
   const container = document.getElementById('stats-container');
   container.innerHTML = '<div class="empty"><span class="spinner"></span> Calculando...</div>';
 
-  const { data: profiles } = await sb.from('profiles').select('*');
+  let profiles;
+  if (activeGroup && groupMemberIds) {
+    const { data: members } = await sb.from('group_members')
+      .select('profiles(id,name,nickname,email)')
+      .eq('group_id', activeGroup.id);
+    profiles = (members || []).map(m => m.profiles).filter(Boolean);
+  } else {
+    const { data } = await sb.from('profiles').select('*');
+    profiles = data || [];
+  }
   const { data: preds } = await sb.from('predictions').select('*, matches(status,goals1,goals2,date,round,group_name)');
-  if (!profiles || !preds) { container.innerHTML = '<div class="empty">Sin datos aún.</div>'; return; }
+  if (!profiles.length || !preds) { container.innerHTML = '<div class="empty">Sin datos aún.</div>'; return; }
 
   // Calculate stats per player
   const playerStats = profiles.map(p => {
@@ -1486,11 +1500,27 @@ async function loadUserGroups() {
   if (userGroups.length === 1) {
     select.value = userGroups[0].id;
     activeGroup = userGroups[0];
+    // Load member IDs
+    const { data: members } = await sb.from('group_members')
+      .select('user_id')
+      .eq('group_id', activeGroup.id);
+    groupMemberIds = new Set((members || []).map(m => m.user_id));
   }
 }
 
-function switchGroup(groupId) {
+let groupMemberIds = null; // null = show all
+
+async function switchGroup(groupId) {
   activeGroup = userGroups.find(g => g.id === groupId) || null;
+  // Load member IDs for active group
+  if (activeGroup) {
+    const { data: members } = await sb.from('group_members')
+      .select('user_id')
+      .eq('group_id', activeGroup.id);
+    groupMemberIds = new Set((members || []).map(m => m.user_id));
+  } else {
+    groupMemberIds = null; // show all
+  }
   // Refresh current tab
   const activeBtn = document.querySelector('.nav-btn.active');
   if (activeBtn) activeBtn.click();
@@ -1659,7 +1689,11 @@ function matchCard(m) {
   }
 
   // All predictions sorted by pts — collapsible mini-ranking
-  const allMatchPreds = allPredictions.filter(p => p.match_id === m.id);
+  const allMatchPreds = allPredictions.filter(p => {
+    if (p.match_id !== m.id) return false;
+    if (groupMemberIds && !groupMemberIds.has(p.user_id)) return false;
+    return true;
+  });
   const rankedPreds = allMatchPreds.map(p => {
     const pts = done ? calcPts(p.pred_goals1, p.pred_goals2, m.goals1, m.goals2, p.pred_et, p.pred_pen, m.status) : null;
     return { ...p, pts };
@@ -1694,7 +1728,9 @@ function matchCard(m) {
   }).join('');
 
   // Show how many have predicted vs total players
-  const totalPlayers = [...new Set(allPredictions.map(p => p.user_id))].length;
+  const totalPlayers = groupMemberIds
+    ? groupMemberIds.size
+    : [...new Set(allPredictions.map(p => p.user_id))].length;
   const predicted = rankedPreds.length;
   const pendingTxt = !done && predicted < totalPlayers ? ' · '+(totalPlayers - predicted)+' pendiente'+(totalPlayers-predicted>1?'s':'') : '';
 
