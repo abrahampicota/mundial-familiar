@@ -455,6 +455,7 @@ async function initApp(user) {
   currentProfile = profile;
   document.getElementById('header-name').textContent = profile?.nickname || profile?.name || user.email;
   await loadUserGroups();
+  await processPendingJoin();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   if (user.email === ADMIN_EMAIL) {
@@ -1377,10 +1378,11 @@ function renderGroupCard(g, isOwner) {
         +'<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+memberCount+' miembro'+(memberCount!==1?'s':'')+(isOwner?' · Tú eres el admin':'')+'</div>'
       +'</div>'
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
-        +'<div style="background:#0a1a30;border:1px solid #2B4EAF;border-radius:8px;padding:4px 10px;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#FFE600;letter-spacing:2px;" title="Código de invitación">'+g.invite_code+'</div>'
+        +'<div style="background:#0a1a30;border:1px solid #2B4EAF;border-radius:8px;padding:4px 10px;font-family:Bebas Neue,sans-serif;font-size:1.1rem;color:#FFE600;letter-spacing:2px;cursor:help;" title="Código: '+g.invite_code+' · Link: '+window.location.origin+'/?join='+g.invite_code+'">'+g.invite_code+'</div>'
         +(isOwner
           ? '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">'
               +'<button data-gid="'+g.id+'" onclick="manageMembers(this.dataset.gid)" style="padding:4px 10px;border:1px solid #2B4EAF;border-radius:6px;background:none;color:#9988bb;font-size:11px;cursor:pointer;">👥 Miembros</button>'
+              +'<button data-code="'+g.invite_code+'" data-name="'+g.name.replace(/"/g,'&quot;')+'" onclick="copyInviteLink(this.dataset.code,this.dataset.name)" style="padding:4px 10px;border:1px solid #7BC829;border-radius:6px;background:none;color:#7BC829;font-size:11px;cursor:pointer;">🔗 Invitar</button>'
               +'<button data-gid="'+g.id+'" data-gname="'+g.name.replace(/"/g,'&quot;')+'" data-gdesc="'+(g.description||'').replace(/"/g,'&quot;')+'" onclick="editGroupBtn(this)" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);font-size:11px;cursor:pointer;">✏️ Editar</button>'
               +'<button data-gid="'+g.id+'" data-gname="'+g.name.replace(/"/g,'&quot;')+'" onclick="deleteGroupBtn(this)" style="padding:4px 10px;border:1px solid #8B1A2A;border-radius:6px;background:none;color:#fc8181;font-size:11px;cursor:pointer;">🗑️ Eliminar</button>'
             +'</div>'
@@ -1450,6 +1452,16 @@ async function removeMemberFromGroup(groupId, userId) {
   manageMembers(groupId);
 }
 
+function copyInviteLink(code, name) {
+  const url = window.location.origin + window.location.pathname + '?join=' + code;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('🔗 Link copiado para "' + name + '" — compártelo por WhatsApp', 'ok');
+  }).catch(() => {
+    // Fallback: show the link in a prompt
+    prompt('Copia este link de invitación para "' + name + '":', url);
+  });
+}
+
 function editGroupBtn(btn) { editGroup(btn.dataset.gid, btn.dataset.gname, btn.dataset.gdesc); }
 function deleteGroupBtn(btn) { deleteGroup(btn.dataset.gid, btn.dataset.gname); }
 function leaveGroupBtn(btn) { leaveGroup(btn.dataset.gid, btn.dataset.gname); }
@@ -1479,6 +1491,30 @@ async function leaveGroup(id, name) {
 }
 
 // ── GROUP SELECTOR ────────────────────────────────────────
+async function processPendingJoin() {
+  const code = sessionStorage.getItem('pendingJoinCode');
+  if (!code) return;
+  sessionStorage.removeItem('pendingJoinCode');
+
+  const { data: group } = await sb.from('groups').select('*').eq('invite_code', code).single();
+  if (!group) { showToast('Código de invitación inválido: ' + code, 'error'); return; }
+
+  // Check if already member
+  const { data: existing } = await sb.from('group_members')
+    .select('id').eq('group_id', group.id).eq('user_id', currentUser.id).single();
+  if (existing) {
+    showToast('Ya eres miembro de "' + group.name + '" 👥', 'ok');
+    return;
+  }
+
+  // Join the group
+  const { error } = await sb.from('group_members').insert({ group_id: group.id, user_id: currentUser.id });
+  if (error) { showToast('Error al unirte al grupo: ' + error.message, 'error'); return; }
+
+  showToast('🎉 Te uniste al grupo "' + group.name + '" exitosamente!', 'ok');
+  await loadUserGroups();
+}
+
 async function loadUserGroups() {
   // Get groups the user belongs to
   const { data: memberships } = await sb.from('group_members')
@@ -2521,6 +2557,16 @@ function toggleRanking(btn) {
   const isOpen = el.style.display !== 'none';
   el.style.display = isOpen ? 'none' : 'block';
   if (icon) icon.textContent = isOpen ? '▲ Ocultar' : '▼ Ver';
+}
+
+// Handle invite link ?join=CODE
+const urlParams = new URLSearchParams(window.location.search);
+const joinCode = urlParams.get('join');
+if (joinCode) {
+  // Store invite code to process after login/register
+  sessionStorage.setItem('pendingJoinCode', joinCode.toUpperCase());
+  // Clean URL without reloading
+  window.history.replaceState({}, '', window.location.pathname);
 }
 
 sb.auth.getSession().then(({ data: { session } }) => {
