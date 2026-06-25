@@ -2177,6 +2177,50 @@ function parseUtcFromStr(dateStr, timeStr) {
   return new Date(local.getTime() - offsetMs);
 }
 
+// List of match IDs where all users should get auto-predictions with the final result
+// Add match IDs here that were missed and need auto-fill
+const AUTO_FILL_MATCH_IDS = [1071, 1072]; // Rep. Checa vs México, Sudáfrica vs Corea del Sur
+
+async function autoInsertMissingPredictions(matchId, goals1, goals2) {
+  // Only auto-fill for matches in the AUTO_FILL_MATCH_IDS list
+  if (!AUTO_FILL_MATCH_IDS.includes(matchId)) return;
+
+  try {
+    // Get all profiles
+    const { data: profiles } = await sb.from('profiles').select('id');
+    if (!profiles?.length) return;
+
+    // Get existing predictions for this match
+    const { data: existing } = await sb.from('predictions')
+      .select('user_id')
+      .eq('match_id', matchId);
+    const existingUserIds = new Set((existing || []).map(p => p.user_id));
+
+    // Insert predictions for users who don't have one
+    const missing = profiles.filter(p => !existingUserIds.has(p.id));
+    if (!missing.length) return;
+
+    const outcome = goals1 > goals2 ? 'home' : goals2 > goals1 ? 'away' : 'draw';
+    const inserts = missing.map(p => ({
+      match_id: matchId,
+      user_id: p.id,
+      pred_goals1: goals1,
+      pred_goals2: goals2,
+      prediction: outcome,
+      pred_et: false,
+      pred_pen: false
+    }));
+
+    const { error } = await sb.from('predictions').insert(inserts);
+    if (!error) {
+      console.log('[Auto-fill] Inserted', inserts.length, 'predictions for match', matchId);
+      showToast('✅ Pronósticos automáticos agregados para ' + inserts.length + ' usuario(s)', 'ok');
+    }
+  } catch(e) {
+    console.warn('Auto-fill error:', e.message);
+  }
+}
+
 async function syncFromGitHub(silent = false) {
   const btn = document.getElementById('github-sync-btn');
   const msg = document.getElementById('github-sync-msg');
@@ -2242,6 +2286,11 @@ async function syncFromGitHub(silent = false) {
             ? '🏆 ' + winner + ' ganó'
             : '🤝 ' + team1 + ' y ' + team2 + ' empataron';
           setTimeout(() => showToast(toastMsg, 'ok'), (updated + 1) * 800);
+
+          // Auto-insert predictions for users who missed this match
+          if (local) {
+            await autoInsertMissingPredictions(local.id, ft[0], ft[1]);
+          }
         }
       }
 
