@@ -1618,7 +1618,7 @@ function toggleDay(btn) {
 const ROUND_DATES = {
   'Grupos':        { start: new Date('2024-01-01T00:00:00Z'), deadline: new Date('2026-06-11T18:00:00Z') },
   // Dieciseisavos: 28 jun - 3 jul. Abre cuando termina fase de grupos (27 jun noche)
-  'Dieciseisavos': { start: new Date('2026-06-28T00:00:00Z'), deadline: new Date('2026-06-28T17:00:00Z') },
+  'Dieciseisavos': { start: new Date('2026-06-28T00:00:00Z'), deadline: new Date('2026-06-28T18:00:00Z') },
   // Octavos: 4-7 jul. Abre cuando terminan dieciseisavos (3 jul noche)
   'Octavos':       { start: new Date('2026-07-04T00:00:00Z'), deadline: new Date('2026-07-04T17:00:00Z') },
   // Cuartos: 9-11 jul. Abre cuando terminan octavos (7 jul noche)
@@ -2179,7 +2179,7 @@ function parseUtcFromStr(dateStr, timeStr) {
 
 // List of match IDs where all users should get auto-predictions with the final result
 // Add match IDs here that were missed and need auto-fill
-const AUTO_FILL_MATCH_IDS = [1071, 1072]; // Rep. Checa vs México, Sudáfrica vs Corea del Sur
+const AUTO_FILL_MATCH_IDS = [2073]; // Solo Sudáfrica vs Canadá - los siguientes quedan en 0
 
 async function autoInsertMissingPredictions(matchId, goals1, goals2) {
   // Only auto-fill for matches in the AUTO_FILL_MATCH_IDS list
