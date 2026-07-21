@@ -978,7 +978,29 @@ async function loadStats() {
       + '</div>';
 
   // Render
+  const penMatches = allMatches.filter(m => m.status === 'PEN')
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const penSection = penMatches.length ? (
+    '<div class="card" style="margin-bottom:1rem;">'
+      + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#9988bb;letter-spacing:1px;margin-bottom:10px;">🥅 DEFINIDOS POR PENALES</div>'
+      + penMatches.map(m => {
+          const penKnown = m.pen1 !== null && m.pen1 !== undefined && m.pen2 !== null && m.pen2 !== undefined;
+          const winner = penKnown ? (m.pen1 > m.pen2 ? m.team1 : m.team2) : null;
+          return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'
+            + '<div style="font-size:13px;flex:1;min-width:0;">'
+              + getFlag(m.team1) + m.team1 + ' <span style="color:#9988bb">' + (m.goals1 ?? 0) + '-' + (m.goals2 ?? 0) + '</span> ' + m.team2 + getFlag(m.team2)
+            + '</div>'
+            + '<div style="text-align:right;flex-shrink:0;">'
+              + '<div style="font-family:Bebas Neue,sans-serif;color:#F5621C;font-size:1.1rem;">' + (penKnown ? m.pen1 + ' - ' + m.pen2 : 'Pendiente') + '</div>'
+              + (winner ? '<div style="font-size:10px;color:#9988bb;">🏆 ' + winner + '</div>' : '')
+            + '</div>'
+          + '</div>';
+        }).join('')
+    + '</div>'
+  ) : '';
+
   container.innerHTML =
+    penSection +
     // Chart card
     '<div class="card" style="margin-bottom:1rem;">'
       + '<div style="font-family:Bebas Neue,sans-serif;font-size:1rem;color:#9988bb;letter-spacing:1px;margin-bottom:10px;">EVOLUCIÓN DE PUNTOS</div>'
@@ -2269,7 +2291,12 @@ async function syncFromGitHub(silent = false) {
       if (!utcDt) continue;
       const dateStr = utcDt.toISOString();
       const ft = m.score?.ft;
-      const hasResult = ft && ft.length === 2;
+      const et = m.score?.et;   // score after extra time (cumulative), if it went to ET
+      const pen = m.score?.p;   // penalty shootout score, if it went to penalties
+      // Final score before penalties: prefer ET score (already cumulative) over FT
+      const finalGoals = et && et.length === 2 ? et : ft;
+      const hasResult = finalGoals && finalGoals.length === 2;
+      const matchStatus = pen && pen.length === 2 ? 'PEN' : (et && et.length === 2 ? 'AET' : 'FT');
 
       // Match local record regardless of team order (source order can differ from local order)
       let local = allMatches.find(lm =>
@@ -2298,15 +2325,21 @@ async function syncFromGitHub(silent = false) {
       }
       if (hasResult) {
         // Always store goals in the order local.team1/local.team2 expect
-        updateData.goals1 = reversed ? ft[1] : ft[0];
-        updateData.goals2 = reversed ? ft[0] : ft[1];
-        updateData.status = 'FT';
+        updateData.goals1 = reversed ? finalGoals[1] : finalGoals[0];
+        updateData.goals2 = reversed ? finalGoals[0] : finalGoals[1];
+        updateData.status = matchStatus;
+        if (matchStatus === 'PEN') {
+          updateData.pen1 = reversed ? pen[1] : pen[0];
+          updateData.pen2 = reversed ? pen[0] : pen[1];
+        }
         withResults++;
 
         if (local && local.status === 'NS') {
-          const winner = ft[0] > ft[1] ? team1 : ft[1] > ft[0] ? team2 : null;
+          const winner = matchStatus === 'PEN'
+            ? (pen[0] > pen[1] ? team1 : team2)
+            : (finalGoals[0] > finalGoals[1] ? team1 : finalGoals[1] > finalGoals[0] ? team2 : null);
           const toastMsg = winner
-            ? '🏆 ' + winner + ' ganó'
+            ? '🏆 ' + winner + (matchStatus === 'PEN' ? ' ganó en penales' : ' ganó')
             : '🤝 ' + team1 + ' y ' + team2 + ' empataron';
           setTimeout(() => showToast(toastMsg, 'ok'), (updated + 1) * 800);
 
@@ -2483,6 +2516,12 @@ async function renderAdminMatchesList() {
                   + '<input id="eg2-'+m.id+'" type="number" min="0" max="20" value="'+(m.goals2??'')+'" placeholder="0" style="width:52px;height:44px;text-align:center;font-family:Bebas Neue,sans-serif;font-size:1.3rem;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#F5C518;outline:none;" />'
                 + '</div>'
               + '</div>'
+              + '<div style="text-align:center;margin-bottom:8px;">'
+                + '<div style="font-size:11px;color:#F5621C;margin-bottom:4px;">🥅 Penales (solo si aplica)</div>'
+                + '<input id="epen1-'+m.id+'" type="number" min="0" max="20" value="'+(m.pen1??'')+'" placeholder="-" style="width:44px;height:36px;text-align:center;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#F5621C;outline:none;" /> '
+                + '<span style="color:#7a9a7a;">-</span> '
+                + '<input id="epen2-'+m.id+'" type="number" min="0" max="20" value="'+(m.pen2??'')+'" placeholder="-" style="width:44px;height:36px;text-align:center;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#F5621C;outline:none;" />'
+              + '</div>'
               + '<div style="display:flex;gap:6px;">'
                 + '<select id="estat-'+m.id+'" style="flex:1;padding:7px;background:#1a221a;border:1px solid #2a382a;border-radius:8px;color:#e8f0e8;font-size:13px;">'
                   + ['NS','1H','HT','2H','FT','AET','PEN'].map(s => '<option value="'+s+'"'+(m.status===s?' selected':'')+'>'+s+'</option>').join('')
@@ -2513,16 +2552,20 @@ async function saveMatchEdit(matchId) {
   const g1Input = document.getElementById('eg1-' + matchId);
   const g2Input = document.getElementById('eg2-' + matchId);
   const statInput = document.getElementById('estat-' + matchId);
+  const pen1Input = document.getElementById('epen1-' + matchId);
+  const pen2Input = document.getElementById('epen2-' + matchId);
   const g1 = g1Input.value === '' ? null : parseInt(g1Input.value);
   const g2 = g2Input.value === '' ? null : parseInt(g2Input.value);
   const status = statInput.value;
+  const pen1 = pen1Input.value === '' ? null : parseInt(pen1Input.value);
+  const pen2 = pen2Input.value === '' ? null : parseInt(pen2Input.value);
 
-  const { error } = await sb.from('matches').update({ goals1: g1, goals2: g2, status }).eq('id', matchId);
+  const { error } = await sb.from('matches').update({ goals1: g1, goals2: g2, status, pen1, pen2 }).eq('id', matchId);
   if (error) { showToast('Error guardando', 'error'); return; }
 
   // Update local state
   const local = allMatches.find(m => m.id === matchId);
-  if (local) { local.goals1 = g1; local.goals2 = g2; local.status = status; }
+  if (local) { local.goals1 = g1; local.goals2 = g2; local.status = status; local.pen1 = pen1; local.pen2 = pen2; }
 
   showToast('Partido actualizado ✓', 'ok');
   closeEditMatch(matchId);
