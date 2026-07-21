@@ -2272,13 +2272,30 @@ async function syncFromGitHub(silent = false) {
       const hasResult = ft && ft.length === 2;
 
       // Match local record regardless of team order (source order can differ from local order)
-      const local = allMatches.find(lm =>
+      let local = allMatches.find(lm =>
         (lm.team1 === team1 && lm.team2 === team2) ||
         (lm.team1 === team2 && lm.team2 === team1)
       );
-      const reversed = !!(local && local.team1 === team2 && local.team2 === team1);
+      let reversed = !!(local && local.team1 === team2 && local.team2 === team1);
+      let resolvingPlaceholder = false;
+
+      // Fallback: local knockout match still shows "Ganador P74" / "Perdedor P74" etc.
+      // Match it by bracket match number (the "P89" in group_name) against the source's `num`.
+      if (!local && m.num != null) {
+        const isPlaceholder = t => /^(Ganador|Perdedor|1|2|3)/.test(t || '');
+        local = allMatches.find(lm => {
+          if (!isPlaceholder(lm.team1) && !isPlaceholder(lm.team2)) return false;
+          const numMatch = (lm.group_name || '').match(/P(\d+)/);
+          return numMatch && parseInt(numMatch[1], 10) === m.num;
+        });
+        if (local) resolvingPlaceholder = true;
+      }
 
       const updateData = { date: dateStr };
+      if (resolvingPlaceholder) {
+        updateData.team1 = team1;
+        updateData.team2 = team2;
+      }
       if (hasResult) {
         // Always store goals in the order local.team1/local.team2 expect
         updateData.goals1 = reversed ? ft[1] : ft[0];
