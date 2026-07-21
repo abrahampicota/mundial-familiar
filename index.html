@@ -2271,15 +2271,21 @@ async function syncFromGitHub(silent = false) {
       const ft = m.score?.ft;
       const hasResult = ft && ft.length === 2;
 
+      // Match local record regardless of team order (source order can differ from local order)
+      const local = allMatches.find(lm =>
+        (lm.team1 === team1 && lm.team2 === team2) ||
+        (lm.team1 === team2 && lm.team2 === team1)
+      );
+      const reversed = !!(local && local.team1 === team2 && local.team2 === team1);
+
       const updateData = { date: dateStr };
       if (hasResult) {
-        updateData.goals1 = ft[0];
-        updateData.goals2 = ft[1];
+        // Always store goals in the order local.team1/local.team2 expect
+        updateData.goals1 = reversed ? ft[1] : ft[0];
+        updateData.goals2 = reversed ? ft[0] : ft[1];
         updateData.status = 'FT';
         withResults++;
 
-        // Show toast for newly finished matches
-        const local = allMatches.find(lm => lm.team1 === team1 && lm.team2 === team2);
         if (local && local.status === 'NS') {
           const winner = ft[0] > ft[1] ? team1 : ft[1] > ft[0] ? team2 : null;
           const toastMsg = winner
@@ -2288,13 +2294,10 @@ async function syncFromGitHub(silent = false) {
           setTimeout(() => showToast(toastMsg, 'ok'), (updated + 1) * 800);
 
           // Auto-insert predictions for users who missed this match
-          if (local) {
-            await autoInsertMissingPredictions(local.id, ft[0], ft[1]);
-          }
+          await autoInsertMissingPredictions(local.id, updateData.goals1, updateData.goals2);
         }
       }
 
-      const local = allMatches.find(lm => lm.team1 === team1 && lm.team2 === team2);
       if (!local) continue;
 
       const { error: dbError } = await sb.from('matches').update(updateData).eq('id', local.id);
