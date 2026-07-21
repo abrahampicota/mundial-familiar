@@ -1694,6 +1694,10 @@ function getFlag(team) {
 
 function buildResultBanner(m) {
   if (m.goals1 === null || m.goals2 === null) return '';
+  if (m.status === 'PEN' && m.pen1 !== null && m.pen1 !== undefined && m.pen2 !== null && m.pen2 !== undefined) {
+    const penWinner = m.pen1 > m.pen2 ? m.team1 : m.team2;
+    return '<div class="result-banner win">🏆 ' + penWinner + ' ganó en penales (' + m.pen1 + '-' + m.pen2 + ')</div>';
+  }
   if (m.goals1 > m.goals2) {
     return '<div class="result-banner win">🏆 ' + m.team1 + ' ganó</div>';
   } else if (m.goals2 > m.goals1) {
@@ -1712,8 +1716,10 @@ function matchCard(m) {
     : live ? '<span class="badge badge-live" style="background:#3a0a0a;color:#fc8181;animation:pulse 1s infinite;">⚽ EN VIVO</span>'
     : '<span class="badge badge-soon">Próximo</span>';
 
+  const penLine = (m.status === 'PEN' && m.pen1 !== null && m.pen1 !== undefined && m.pen2 !== null && m.pen2 !== undefined)
+    ? `<div style="font-size:10px;color:#F5621C;margin-top:1px;">🥅 Pen: ${m.pen1}-${m.pen2}</div>` : '';
   const scoreHtml = done
-    ? `<div class="score-box"><div class="score">${m.goals1} - ${m.goals2}</div><div style="font-size:10px;color:var(--text-muted)">Final</div></div>`
+    ? `<div class="score-box"><div class="score">${m.goals1} - ${m.goals2}</div><div style="font-size:10px;color:var(--text-muted)">${m.status === 'AET' ? 'Final (ET)' : 'Final'}</div>${penLine}</div>`
     : live
     ? `<div class="score-box" style="border-color:#742a2a"><div class="score" style="color:#fc8181">${m.goals1 ?? 0} - ${m.goals2 ?? 0}</div><div style="font-size:10px;color:#fc8181">En juego</div></div>`
     : `<div class="score-box"><div class="score" style="font-size:1rem;color:var(--text-muted)">vs</div></div>`;
@@ -2500,7 +2506,7 @@ async function renderAdminMatchesList() {
                 + '<div style="font-weight:500;font-size:14px;color:#e8f0e8;">' + m.team1 + ' vs ' + m.team2 + '</div>'
               + '</div>'
               + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
-                + (done ? '<span class="badge badge-done" style="font-size:10px;">'+m.goals1+' - '+m.goals2+'</span>' : '<span class="badge badge-soon" style="font-size:10px;">NS</span>')
+                + (done ? '<span class="badge badge-done" style="font-size:10px;">'+m.goals1+' - '+m.goals2+(m.status==='PEN'&&m.pen1!=null&&m.pen2!=null?' (pen '+m.pen1+'-'+m.pen2+')':'')+'</span>' : '<span class="badge badge-soon" style="font-size:10px;">NS</span>')
                 + '<button onclick="openEditMatch('+m.id+')" style="padding:5px 10px;border:1px solid #2a382a;border-radius:6px;background:none;color:#7a9a7a;font-size:12px;cursor:pointer;">✏️ Editar</button>'
               + '</div>'
             + '</div>'
